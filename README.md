@@ -2,7 +2,7 @@
 
 Curated collection of Claude Code skills for autonomous development workflows.
 
-By [Nathan Onn](https://github.com/nathanonn)
+By [Nathan Onn](https://www.nathanonn.com)
 
 ---
 
@@ -30,7 +30,7 @@ Turn a rough CLI tool idea (even a vague one) into the three files Codex `/goal`
 
 **Convert a web game idea into a complete Codex /goal-ready Phaser 3 project.**
 
-Turn a rough game idea (like "build a Raiden-type game" or "make a card game") into a runnable Phaser 3 scaffold plus every goal folder needed for autonomous implementation. Auto-detects genre (shoot-em-up, card game, platformer, tower defense, puzzle), decomposes into 5-7 goals following a universal build order, and bakes in state bridge verification (window.__GAME_STATE__ + Playwright).
+Turn a rough game idea (like "build a Raiden-type game" or "make a card game") into a runnable Phaser 3 scaffold plus every goal folder needed for autonomous implementation. Auto-detects genre (shoot-em-up, card game, platformer, tower defense, puzzle), decomposes into 5-7 goals following a universal build order, and bakes in state bridge verification (window.**GAME_STATE** + Playwright).
 
 **Supports:** shoot-em-up, card-game, platformer, tower-defense, puzzle genres and their variants. Also supports extending existing games with new features.
 
