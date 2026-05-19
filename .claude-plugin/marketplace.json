@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace-manifest.json",
+  "name": "nathanonn-agent-skills",
+  "description": "Curated collection of Claude Code skills for autonomous development workflows.",
+  "version": "1.0.0",
+  "owner": {
+    "name": "Nathan Onn",
+    "url": "https://github.com/nathanonn"
+  },
+  "plugins": [
+    {
+      "name": "ask-first",
+      "displayName": "Ask First",
+      "source": "./plugins/ask-first",
+      "description": "Ask clarifying questions before executing tasks. Reaches 95% confidence through structured Q&A, then executes.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Onn"
+      },
+      "license": "MIT",
+      "keywords": ["clarification", "questions", "requirements", "workflow"],
+      "category": "workflow"
+    },
+    {
+      "name": "cli-spec-to-goal",
+      "displayName": "CLI Spec to Goal",
+      "source": "./plugins/cli-spec-to-goal",
+      "description": "Convert a Node.js CLI tool specification into a Codex /goal-ready bundle with AI-agent-friendly patterns baked in.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Onn"
+      },
+      "license": "MIT",
+      "keywords": ["cli", "nodejs", "codex", "goal", "specification", "scaffold"],
+      "category": "development"
+    },
+    {
+      "name": "webg-spec-to-goal",
+      "displayName": "Web Game Spec to Goal",
+      "source": "./plugins/webg-spec-to-goal",
+      "description": "Convert a web game idea into a complete Codex /goal-ready Phaser 3 project with scaffold, goals-plan, and all goal folders.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Onn"
+      },
+      "license": "MIT",
+      "keywords": ["game", "phaser", "codex", "goal", "specification", "scaffold"],
+      "category": "development"
+    },
+    {
+      "name": "wp-spec-to-goal",
+      "displayName": "WordPress Spec to Goal",
+      "source": "./plugins/wp-spec-to-goal",
+      "description": "Convert a WordPress plugin or feature idea into a Codex /goal-ready bundle with wp-env + Playwright verification.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Onn"
+      },
+      "license": "MIT",
+      "keywords": ["wordpress", "plugin", "codex", "goal", "specification", "scaffold"],
+      "category": "development"
+    }
+  ]
+}

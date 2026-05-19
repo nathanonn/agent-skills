@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "wp-spec-to-goal",
+  "displayName": "WordPress Spec to Goal",
+  "version": "1.0.0",
+  "description": "Convert a WordPress plugin or feature idea into a Codex /goal-ready bundle with wp-env + Playwright verification.",
+  "author": {
+    "name": "Nathan Onn",
+    "url": "https://github.com/nathanonn"
+  },
+  "repository": "https://github.com/nathanonn/agent-skills",
+  "license": "MIT",
+  "keywords": ["wordpress", "plugin", "codex", "goal", "specification", "scaffold"]
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "webg-spec-to-goal",
+  "displayName": "Web Game Spec to Goal",
+  "version": "1.0.0",
+  "description": "Convert a web game idea into a complete Codex /goal-ready Phaser 3 project with scaffold, goals-plan, and all goal folders.",
+  "author": {
+    "name": "Nathan Onn",
+    "url": "https://github.com/nathanonn"
+  },
+  "repository": "https://github.com/nathanonn/agent-skills",
+  "license": "MIT",
+  "keywords": ["game", "phaser", "codex", "goal", "specification", "scaffold"]
+}

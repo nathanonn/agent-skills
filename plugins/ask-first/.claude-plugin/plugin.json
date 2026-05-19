@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "ask-first",
+  "displayName": "Ask First",
+  "version": "1.0.0",
+  "description": "Ask clarifying questions before executing tasks. Reaches 95% confidence through structured Q&A, then executes.",
+  "author": {
+    "name": "Nathan Onn",
+    "url": "https://github.com/nathanonn"
+  },
+  "repository": "https://github.com/nathanonn/agent-skills",
+  "license": "MIT",
+  "keywords": ["clarification", "questions", "requirements", "workflow"]
+}
