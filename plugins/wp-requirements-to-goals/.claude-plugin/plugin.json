@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "wp-requirements-to-goals",
+  "displayName": "WordPress Requirements to Goals",
+  "version": "1.0.0",
+  "description": "Convert a full WordPress plugin requirements.md into a complete Codex /goal-ready project: goals-plan.md, root scaffold, and a layered goals/ tree (foundation, per-US, non-US, integration).",
+  "author": {
+    "name": "Nathan Onn",
+    "url": "https://github.com/nathanonn"
+  },
+  "repository": "https://github.com/nathanonn/agent-skills",
+  "license": "MIT",
+  "keywords": ["wordpress", "plugin", "codex", "goal", "requirements", "multi-goal", "scaffold"]
+}

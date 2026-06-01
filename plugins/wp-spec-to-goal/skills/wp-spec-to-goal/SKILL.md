@@ -17,6 +17,8 @@ goals/<slug>/
 
 The skill optionally scaffolds a missing plugin (plugin folder + `.wp-env.json` + `package.json` + `AGENTS.md`) and prints a tailored `/goal` command at the end.
 
+> **Prerequisite — playwright-cli.** The generated `VERIFY.md` drives browser-visible checks through [playwright-cli](https://raw.githubusercontent.com/microsoft/playwright-cli/refs/heads/main/README.md). Install it once on the machine that runs `/goal`: `npm install -g @playwright/cli@latest` then `playwright-cli install --skills` (needs Node.js 18+). If it isn't installed, this skill still produces the bundle — it just prepends a "Setup prerequisites" section to `VERIFY.md` so `/goal` knows to install it first.
+
 ## Why this skill exists
 
 A full multi-prompt workflow kit is overkill for plugins or features that fit in one or two goal slices. This skill collapses the "spec → goal trio" hop into a single guided conversation that:

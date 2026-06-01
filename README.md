@@ -45,6 +45,20 @@ Turn a rough WordPress plugin or feature idea into the three files Codex `/goal`
 **Supports:** New plugins and features for existing plugins, wp-env development environment, Playwright browser testing, wp-eval PHP verification.
 
 > **Prerequisite:** This skill generates goal bundles for the [Codex /goal](https://docs.openai.com/codex) autonomous coding workflow. The generated goal trio is designed to be consumed by an AI agent running Codex `/goal` commands to implement the WordPress plugin autonomously.
+>
+> **Also requires [playwright-cli](https://raw.githubusercontent.com/microsoft/playwright-cli/refs/heads/main/README.md):** the generated `VERIFY.md` performs browser-visible verification through playwright-cli. Install it once with `npm install -g @playwright/cli@latest` then `playwright-cli install --skills` (needs Node.js 18+).
+
+### wp-requirements-to-goals
+
+**Convert a full WordPress plugin requirements.md into a complete Codex /goal-ready project.**
+
+The full-workflow counterpart to `wp-spec-to-goal`: where that skill handles a single vague spec, this one takes a complete `requirements.md` (multiple user stories, edge cases, settings catalog, cross-cutting features) and decomposes it into an entire multi-goal project — a `goals-plan.md`, a root scaffold (.wp-env.json, package.json, AGENTS.md, plugin bootstrap, run-goals.sh, protocols), and a layered `goals/` tree (foundation → per-user-story → non-US features → integration). Probes the repo to skip clarifications the filesystem already answers, asks the rest in ≤3 rounds, and supports phased or one-shot runs plus a resume and an extend mode.
+
+**Supports:** Multi-goal full requirements, phased (checkpoint after plan) or one-shot mode, resume from an existing goals-plan.md, extend mode for completed projects, wp-env + Playwright + wp-eval verification.
+
+> **Prerequisite:** This skill generates goal bundles for the [Codex /goal](https://docs.openai.com/codex) autonomous coding workflow. The generated project and goal folders are designed to be consumed by an AI agent running sequential Codex `/goal` commands to implement the WordPress plugin autonomously.
+>
+> **Also requires [playwright-cli](https://raw.githubusercontent.com/microsoft/playwright-cli/refs/heads/main/README.md):** every goal's `VERIFY.md` performs browser-visible verification through playwright-cli. Install it once with `npm install -g @playwright/cli@latest` then `playwright-cli install --skills` (needs Node.js 18+). Phase 2 also bundles a host-installed playwright-cli skill into the generated project's `.codex/skills/`.
 
 ---
 
@@ -61,6 +75,7 @@ Turn a rough WordPress plugin or feature idea into the three files Codex `/goal`
 /plugin install cli-spec-to-goal@nathanonn-agent-skills
 /plugin install webg-spec-to-goal@nathanonn-agent-skills
 /plugin install wp-spec-to-goal@nathanonn-agent-skills
+/plugin install wp-requirements-to-goals@nathanonn-agent-skills
 ```
 
 ### Manual installation
@@ -87,6 +102,9 @@ Once installed, skills are available as slash commands in Claude Code:
 /cli-spec-to-goal A CLI tool that converts CSV files to JSON with filtering
 /webg-spec-to-goal Build a bullet hell shooter with power-ups
 /wp-spec-to-goal A WordPress plugin that adds custom post type for recipes
+
+# Requirements-to-goals: point it at a full requirements doc
+/wp-requirements-to-goals Build the plugin described in requirements.md
 ```
 
 ---
