@@ -1,0 +1,30 @@
+name: skills-mirror-check
+
+# Ensures the generated skills/ mirror stays in sync with plugins/
+# (the single source of truth). If someone edits a skill under plugins/
+# but forgets to run ./sync-skills.sh, this fails the PR.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "plugins/**"
+      - "skills/**"
+      - "sync-skills.sh"
+      - ".github/workflows/sync-skills-check.yml"
+  pull_request:
+    paths:
+      - "plugins/**"
+      - "skills/**"
+      - "sync-skills.sh"
+      - ".github/workflows/sync-skills-check.yml"
+
+jobs:
+  check-mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify skills/ mirror matches plugins/
+        run: ./sync-skills.sh --check
