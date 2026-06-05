@@ -1,6 +1,6 @@
 # Agent Skills
 
-Curated collection of Claude Code skills for autonomous development workflows.
+Curated collection of agent skills for autonomous development workflows. Install them into **Claude Code**, **Codex**, **Cursor**, **GitHub Copilot**, and other agents — via the Claude Code plugin marketplace or the open Agent Skills CLI.
 
 By [Nathan Onn](https://www.nathanonn.com)
 
@@ -64,13 +64,42 @@ The full-workflow counterpart to `wp-spec-to-goal`: where that skill handles a s
 
 ## Installation
 
-### From the marketplace
+These skills install two ways. Pick whichever matches your agent.
+
+### Agent Skills CLI — Codex, Cursor, GitHub Copilot, Claude Code, and others
+
+The open [Agent Skills CLI](https://www.skills.sh) (`npx skills`) installs into any
+supported agent. It reads the canonical [`skills/`](skills/) directory at the repo root.
+
+```bash
+# List the available skills
+npx skills add nathanonn/agent-skills --list
+
+# Install one skill for your auto-detected agents
+npx skills add nathanonn/agent-skills --skill ask-first
+
+# Install one skill for a specific agent
+npx skills add nathanonn/agent-skills --skill ask-first --agent codex
+npx skills add nathanonn/agent-skills --skill ask-first --agent cursor
+npx skills add nathanonn/agent-skills --skill ask-first --agent github-copilot
+npx skills add nathanonn/agent-skills --skill ask-first --agent claude-code
+
+# Install globally instead of into the current project
+npx skills add nathanonn/agent-skills --skill ask-first --agent codex --global
+
+# Install every skill into all supported detected agents
+npx skills add nathanonn/agent-skills --all
+```
+
+### Claude Code plugin marketplace
+
+For Claude Code, you can also install the packaged plugin versions:
 
 ```bash
 # Add the marketplace
 /plugin marketplace add nathanonn/agent-skills
 
-# Install individual skills
+# Install individual plugins
 /plugin install ask-first@nathanonn-agent-skills
 /plugin install cli-spec-to-goal@nathanonn-agent-skills
 /plugin install webg-spec-to-goal@nathanonn-agent-skills
@@ -84,15 +113,20 @@ The full-workflow counterpart to `wp-spec-to-goal`: where that skill handles a s
 # Clone the repo
 git clone https://github.com/nathanonn/agent-skills.git
 
-# Copy a specific plugin to your project's .claude directory
+# Claude Code: copy a plugin into your project's .claude directory
 cp -r agent-skills/plugins/ask-first .claude/plugins/ask-first
+
+# Other agents: copy a skill folder into your agent's skills directory
+# (e.g. Codex: ~/.codex/skills/ — see your agent's docs for the path)
+cp -r agent-skills/skills/ask-first <your-agent-skills-dir>/ask-first
 ```
 
 ---
 
 ## Usage
 
-Once installed, skills are available as slash commands in Claude Code:
+Once installed, invoke a skill by describing the task. In Claude Code, skills are
+also available as slash commands:
 
 ```bash
 # Ask-first: prefix any task with the skill
@@ -106,6 +140,36 @@ Once installed, skills are available as slash commands in Claude Code:
 # Requirements-to-goals: point it at a full requirements doc
 /wp-requirements-to-goals Build the plugin described in requirements.md
 ```
+
+---
+
+## Repository layout
+
+```txt
+agent-skills/
+  skills/                 # canonical Agent Skills (npx skills / Codex / Cursor / ...)
+    <name>/SKILL.md       # generated mirror — do not hand-edit
+  plugins/                # Claude Code plugin marketplace (single source of truth)
+    <name>/skills/<name>/SKILL.md
+  .claude-plugin/         # marketplace manifest
+  skills.sh.json          # skills.sh page grouping (display only)
+  sync-skills.sh          # regenerates skills/ from plugins/
+```
+
+`plugins/` is the **single source of truth**. The root `skills/` directory is a
+generated mirror that exists so the Agent Skills CLI and non-Claude agents get a
+clean `skills/<name>/SKILL.md` discovery path.
+
+### Contributing — keep the mirror in sync
+
+Edit skills under `plugins/<name>/skills/<name>/`, then regenerate the mirror:
+
+```bash
+./sync-skills.sh            # rebuild skills/ from plugins/
+./sync-skills.sh --check    # verify skills/ matches plugins/ (CI-friendly)
+```
+
+Never hand-edit files under `skills/` — they are overwritten on every sync.
 
 ---
 
