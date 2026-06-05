@@ -1,0 +1,21 @@
+{
+  "$schema": "https://skills.sh/schemas/skills.sh.schema.json",
+  "notGrouped": "bottom",
+  "groupings": [
+    {
+      "title": "Planning",
+      "description": "Skills for clarifying ambiguous work before execution.",
+      "skills": ["ask-first"]
+    },
+    {
+      "title": "Codex /goal",
+      "description": "Skills that produce Codex /goal-ready implementation bundles.",
+      "skills": [
+        "cli-spec-to-goal",
+        "webg-spec-to-goal",
+        "wp-spec-to-goal",
+        "wp-requirements-to-goals"
+      ]
+    }
+  ]
+}
