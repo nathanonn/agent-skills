@@ -72,6 +72,19 @@
       "license": "MIT",
       "keywords": ["wordpress", "plugin", "codex", "goal", "requirements", "multi-goal", "scaffold"],
       "category": "development"
+    },
+    {
+      "name": "codex-imagegen",
+      "displayName": "Codex Imagegen",
+      "source": "./plugins/codex-imagegen",
+      "description": "Generate images via Codex's built-in $imagegen skill, land them in the project, and auto-clean the generated_images cache so storage stays flat.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Onn"
+      },
+      "license": "MIT",
+      "keywords": ["image", "imagegen", "codex", "generate", "featured-image", "media"],
+      "category": "media"
     }
   ]
 }

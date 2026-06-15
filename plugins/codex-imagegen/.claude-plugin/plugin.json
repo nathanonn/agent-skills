@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "codex-imagegen",
+  "displayName": "Codex Imagegen",
+  "version": "1.0.0",
+  "description": "Generate images via Codex's built-in $imagegen skill, land them in the project, and auto-clean the generated_images cache so storage stays flat.",
+  "author": {
+    "name": "Nathan Onn",
+    "url": "https://github.com/nathanonn"
+  },
+  "repository": "https://github.com/nathanonn/agent-skills",
+  "license": "MIT",
+  "keywords": ["image", "imagegen", "codex", "generate", "featured-image", "media"]
+}
