@@ -60,6 +60,16 @@ The full-workflow counterpart to `wp-spec-to-goal`: where that skill handles a s
 >
 > **Also requires [playwright-cli](https://raw.githubusercontent.com/microsoft/playwright-cli/refs/heads/main/README.md):** every goal's `VERIFY.md` performs browser-visible verification through playwright-cli. Install it once with `npm install -g @playwright/cli@latest` then `playwright-cli install --skills` (needs Node.js 18+). Phase 2 also bundles a host-installed playwright-cli skill into the generated project's `.codex/skills/`.
 
+### codex-imagegen
+
+**Generate images with Codex's built-in `$imagegen` and keep them out of your cache.**
+
+Generate images (featured images, illustrations, thumbnails, blog visuals) through Codex's `$imagegen` skill and land them straight into your project — defaulting to a `.codex-image/` folder if you don't name a destination. A single bundled script handles everything: it survives codex plugin version bumps (globs for the companion, newest wins), falls back to the `codex exec` CLI when the plugin is absent, and auto-removes each run's `~/.codex/generated_images/<thread-id>/` folder after the image is safely placed so storage stays flat. Includes `--report` and `--sweep` for clearing leftover folders from past sessions.
+
+**Supports:** codex plugin runtime or Codex CLI fallback, custom or default destinations, multiple variants, leftover-cache reporting and sweeping.
+
+> **Prerequisite:** Requires either the **codex plugin** in Claude Code (`/plugin marketplace add openai/codex-plugin-cc` then `/plugin install codex@openai-codex`; [full guide](https://github.com/openai/codex-plugin-cc#install)) **or** the **Codex CLI** (`npm i -g @openai/codex` then `codex login`). Auth is OpenAI/ChatGPT-account backed.
+
 ---
 
 ## Installation
@@ -105,6 +115,7 @@ For Claude Code, you can also install the packaged plugin versions:
 /plugin install webg-spec-to-goal@nathanonn-agent-skills
 /plugin install wp-spec-to-goal@nathanonn-agent-skills
 /plugin install wp-requirements-to-goals@nathanonn-agent-skills
+/plugin install codex-imagegen@nathanonn-agent-skills
 ```
 
 ### Manual installation
@@ -139,6 +150,9 @@ also available as slash commands:
 
 # Requirements-to-goals: point it at a full requirements doc
 /wp-requirements-to-goals Build the plugin described in requirements.md
+
+# Codex-imagegen: describe the image you want
+/codex-imagegen A minimalist line-art lighthouse, square 1024x1024, as hero.png
 ```
 
 ---

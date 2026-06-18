@@ -16,6 +16,11 @@
         "wp-spec-to-goal",
         "wp-requirements-to-goals"
       ]
+    },
+    {
+      "title": "Media",
+      "description": "Skills for generating images and visual assets.",
+      "skills": ["codex-imagegen"]
     }
   ]
 }
