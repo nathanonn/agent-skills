@@ -85,6 +85,19 @@
       "license": "MIT",
       "keywords": ["image", "imagegen", "codex", "generate", "featured-image", "media"],
       "category": "media"
+    },
+    {
+      "name": "handoff-doc",
+      "displayName": "Handoff Doc",
+      "source": "./plugins/handoff-doc",
+      "description": "Write or update a session handoff doc so a future session (Claude or human) can resume work without re-reading the whole transcript.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Onn"
+      },
+      "license": "MIT",
+      "keywords": ["handoff", "documentation", "session", "continuity", "notes", "workflow"],
+      "category": "workflow"
     }
   ]
 }

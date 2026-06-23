@@ -21,6 +21,11 @@
       "title": "Media",
       "description": "Skills for generating images and visual assets.",
       "skills": ["codex-imagegen"]
+    },
+    {
+      "title": "Documentation",
+      "description": "Skills for capturing work so it can be handed off and resumed.",
+      "skills": ["handoff-doc"]
     }
   ]
 }
