@@ -70,6 +70,14 @@ Generate images (featured images, illustrations, thumbnails, blog visuals) throu
 
 > **Prerequisite:** Requires either the **codex plugin** in Claude Code (`/plugin marketplace add openai/codex-plugin-cc` then `/plugin install codex@openai-codex`; [full guide](https://github.com/openai/codex-plugin-cc#install)) **or** the **Codex CLI** (`npm i -g @openai/codex` then `codex login`). Auth is OpenAI/ChatGPT-account backed.
 
+### handoff-doc
+
+**Write a session handoff doc so the next session can pick up cold.**
+
+Distills the current session into one tight handoff doc — what was done, where things live, what's verified, and what's still open — so a future session (Claude or human) can resume without re-reading the whole transcript. You give the destination path; the skill supplies the content. It matches the destination folder's existing filename convention, asks before overwriting an existing handoff (overwrite / append / sequel), flags filename-date typos, and stays honest about what was *not* verified.
+
+**Trigger:** "write a handoff", "create a handoff doc", "update the handoff", "hand this off", or point at a path and say to capture where things stand.
+
 ---
 
 ## Installation
@@ -116,6 +124,7 @@ For Claude Code, you can also install the packaged plugin versions:
 /plugin install wp-spec-to-goal@nathanonn-agent-skills
 /plugin install wp-requirements-to-goals@nathanonn-agent-skills
 /plugin install codex-imagegen@nathanonn-agent-skills
+/plugin install handoff-doc@nathanonn-agent-skills
 ```
 
 ### Manual installation
@@ -153,6 +162,9 @@ also available as slash commands:
 
 # Codex-imagegen: describe the image you want
 /codex-imagegen A minimalist line-art lighthouse, square 1024x1024, as hero.png
+
+# Handoff-doc: give it a destination path to capture where things stand
+/handoff-doc Write a handoff to notes/handoff/20260623_01_auth-refactor.md
 ```
 
 ---

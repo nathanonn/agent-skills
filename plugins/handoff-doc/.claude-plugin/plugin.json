@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "handoff-doc",
+  "displayName": "Handoff Doc",
+  "version": "1.0.0",
+  "description": "Write or update a session handoff doc so a future session (Claude or human) can resume work without re-reading the whole transcript.",
+  "author": {
+    "name": "Nathan Onn",
+    "url": "https://github.com/nathanonn"
+  },
+  "repository": "https://github.com/nathanonn/agent-skills",
+  "license": "MIT",
+  "keywords": ["handoff", "documentation", "session", "continuity", "notes", "workflow"]
+}
