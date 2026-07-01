@@ -98,6 +98,19 @@
       "license": "MIT",
       "keywords": ["handoff", "documentation", "session", "continuity", "notes", "workflow"],
       "category": "workflow"
+    },
+    {
+      "name": "extract-design-md",
+      "displayName": "Extract DESIGN.md",
+      "source": "./plugins/extract-design-md",
+      "description": "Extract a website's design system into a DESIGN.md file (google-labs-code/design.md format) — colors, typography, radius/spacing scales, components, and brand feel — via playwright-cli token extraction plus the official linter.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Onn"
+      },
+      "license": "MIT",
+      "keywords": ["design", "design-system", "design-tokens", "css", "playwright", "frontend"],
+      "category": "design"
     }
   ]
 }

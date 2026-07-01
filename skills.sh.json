@@ -26,6 +26,11 @@
       "title": "Documentation",
       "description": "Skills for capturing work so it can be handed off and resumed.",
       "skills": ["handoff-doc"]
+    },
+    {
+      "title": "Design",
+      "description": "Skills for capturing and reverse-engineering a site's visual design system.",
+      "skills": ["extract-design-md"]
     }
   ]
 }

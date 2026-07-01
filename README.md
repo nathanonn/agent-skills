@@ -78,6 +78,18 @@ Distills the current session into one tight handoff doc — what was done, where
 
 **Trigger:** "write a handoff", "create a handoff doc", "update the handoff", "hand this off", or point at a path and say to capture where things stand.
 
+### extract-design-md
+
+**Extract a website's design system into a DESIGN.md file.**
+
+Point it at a live URL and it compiles a [DESIGN.md](https://github.com/google-labs-code/design.md) — YAML design tokens (colors, typography, `rounded`/`spacing` scales, components) plus prose in canonical section order — good enough to hand a coding agent so it builds new UI matching the source site. Instead of eyeballing a screenshot, it samples 3–5 real pages with playwright-cli and reads each one's CSS custom properties + computed styles (precise and cheap), takes light screenshots for the prose only, detects light/dark themes, and validates every file with the official `@google/design.md` linter as a quality gate.
+
+**Supports:** single- or dual-theme sites (emits `DESIGN.light.md` + `DESIGN.dark.md` when both exist), Tailwind and non-Tailwind token systems, auto page-selection with override, and graceful fallbacks (no design system, Firecrawl down, lint skipped).
+
+**Trigger:** `/extract-design-md <url>`, "extract the design system from &lt;url&gt;", "make a DESIGN.md from &lt;site&gt;", "get the design tokens off &lt;site&gt;", "I want my UI to look like &lt;site&gt;".
+
+> **Prerequisites:** [playwright-cli](https://github.com/microsoft/playwright-cli) on `PATH` (`npm install -g @playwright/cli@latest` then `playwright-cli install --skills`, needs Node.js 18+), a reachable [Firecrawl](https://github.com/mendableai/firecrawl) instance for page discovery (falls back to playwright link discovery if absent), and `npx` for the on-demand `@google/design.md` linter (skipped gracefully if unavailable).
+
 ---
 
 ## Installation
@@ -125,6 +137,7 @@ For Claude Code, you can also install the packaged plugin versions:
 /plugin install wp-requirements-to-goals@nathanonn-agent-skills
 /plugin install codex-imagegen@nathanonn-agent-skills
 /plugin install handoff-doc@nathanonn-agent-skills
+/plugin install extract-design-md@nathanonn-agent-skills
 ```
 
 ### Manual installation
@@ -165,6 +178,9 @@ also available as slash commands:
 
 # Handoff-doc: give it a destination path to capture where things stand
 /handoff-doc Write a handoff to notes/handoff/20260623_01_auth-refactor.md
+
+# Extract-design-md: point it at a site URL
+/extract-design-md https://linear.app
 ```
 
 ---

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "extract-design-md",
+  "displayName": "Extract DESIGN.md",
+  "version": "1.0.0",
+  "description": "Extract a website's design system into a DESIGN.md file (google-labs-code/design.md format) — colors, typography, radius/spacing scales, components, and brand feel — via playwright-cli token extraction plus the official linter.",
+  "author": {
+    "name": "Nathan Onn",
+    "url": "https://github.com/nathanonn"
+  },
+  "repository": "https://github.com/nathanonn/agent-skills",
+  "license": "MIT",
+  "keywords": ["design", "design-system", "design-tokens", "css", "playwright", "frontend"]
+}
