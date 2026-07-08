@@ -111,6 +111,19 @@
       "license": "MIT",
       "keywords": ["design", "design-system", "design-tokens", "css", "playwright", "frontend"],
       "category": "design"
+    },
+    {
+      "name": "extract-design-system",
+      "displayName": "Extract Design System",
+      "source": "./plugins/extract-design-system",
+      "description": "Extract a website's full design system — tokens plus a curated component catalog (anatomy, variants, hover/focus states, section patterns) with DTCG tokens and an emitted eval harness — as a bundle a coding agent consumes to build new pages native to the source brand.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Onn"
+      },
+      "license": "MIT",
+      "keywords": ["design", "design-system", "components", "component-catalog", "design-tokens", "playwright", "frontend"],
+      "category": "design"
     }
   ]
 }
