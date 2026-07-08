@@ -90,6 +90,18 @@ Point it at a live URL and it compiles a [DESIGN.md](https://github.com/google-l
 
 > **Prerequisites:** [playwright-cli](https://github.com/microsoft/playwright-cli) on `PATH` (`npm install -g @playwright/cli@latest` then `playwright-cli install --skills`, needs Node.js 18+), a reachable [Firecrawl](https://github.com/mendableai/firecrawl) instance for page discovery (falls back to playwright link discovery if absent), and `npx` for the on-demand `@google/design.md` linter (skipped gracefully if unavailable).
 
+### extract-design-system
+
+**Extract a website's full design system — tokens *and* a component catalog — as a bundle for building native-looking pages.**
+
+The superset of `extract-design-md`. Where that skill hands you a token-only `DESIGN.md`, this one captures the whole system a coding agent needs to generate pages that reuse the source's *actual* components: a `DESIGN.md`, a component catalog (per-component anatomy, variants, and hover/focus states), reference snippets, section patterns, DTCG design tokens, and an emitted eval harness. It samples real pages with playwright-cli, reads CSS custom properties + computed styles, and packages everything under `.design_systems/<domain>-YYYYMMDD/`. This fixes the "same skin, different skeletons" failure of token-only extraction — new pages come out with the same buttons, cards, and sections as the source, not just the same colors and fonts.
+
+**Supports:** full-bundle output (DESIGN.md + component catalog + reference snippets + section patterns + DTCG tokens + eval harness), single- or dual-theme sites, Tailwind and non-Tailwind token systems, auto page-selection with override, and graceful fallbacks.
+
+**Trigger:** `/extract-design-system <url>`, "clone the design system", "extract components from &lt;url&gt;", "make new pages that look like &lt;site&gt;", "same buttons/cards/sections as &lt;site&gt;".
+
+> **Prerequisites:** [playwright-cli](https://github.com/microsoft/playwright-cli) on `PATH` (`npm install -g @playwright/cli@latest` then `playwright-cli install --skills`, needs Node.js 18+), a reachable [Firecrawl](https://github.com/mendableai/firecrawl) instance for page discovery (falls back to playwright link discovery if absent), and `npx` for the on-demand `@google/design.md` linter (skipped gracefully if unavailable).
+
 ---
 
 ## Installation
@@ -138,6 +150,7 @@ For Claude Code, you can also install the packaged plugin versions:
 /plugin install codex-imagegen@nathanonn-agent-skills
 /plugin install handoff-doc@nathanonn-agent-skills
 /plugin install extract-design-md@nathanonn-agent-skills
+/plugin install extract-design-system@nathanonn-agent-skills
 ```
 
 ### Manual installation
@@ -179,8 +192,11 @@ also available as slash commands:
 # Handoff-doc: give it a destination path to capture where things stand
 /handoff-doc Write a handoff to notes/handoff/20260623_01_auth-refactor.md
 
-# Extract-design-md: point it at a site URL
+# Extract-design-md: point it at a site URL for a token-only DESIGN.md
 /extract-design-md https://linear.app
+
+# Extract-design-system: point it at a site URL for the full component bundle
+/extract-design-system https://linear.app
 ```
 
 ---

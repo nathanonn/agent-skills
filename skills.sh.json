@@ -30,7 +30,7 @@
     {
       "title": "Design",
       "description": "Skills for capturing and reverse-engineering a site's visual design system.",
-      "skills": ["extract-design-md"]
+      "skills": ["extract-design-md", "extract-design-system"]
     }
   ]
 }
