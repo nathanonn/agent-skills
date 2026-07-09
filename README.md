@@ -78,6 +78,14 @@ Distills the current session into one tight handoff doc — what was done, where
 
 **Trigger:** "write a handoff", "create a handoff doc", "update the handoff", "hand this off", or point at a path and say to capture where things stand.
 
+### xquik
+
+**Plan and implement Xquik REST API, MCP, webhook, and X data automation workflows.**
+
+Use this skill when a user wants to build with Xquik's public REST API, MCP server, webhooks, or X automation tools. It keeps endpoint, request, response, and setup guidance tied to Xquik's public API reference, MCP docs, MCP manifest, and OpenAPI document.
+
+**Trigger:** "use Xquik", "Xquik MCP", "Xquik API", "X data automation", "monitor an X account", "send Xquik webhooks", or related REST API and MCP integration requests.
+
 ### extract-design-md
 
 **Extract a website's design system into a DESIGN.md file.**
@@ -151,6 +159,7 @@ For Claude Code, you can also install the packaged plugin versions:
 /plugin install wp-requirements-to-goals@nathanonn-agent-skills
 /plugin install codex-imagegen@nathanonn-agent-skills
 /plugin install handoff-doc@nathanonn-agent-skills
+/plugin install xquik@nathanonn-agent-skills
 /plugin install extract-design-md@nathanonn-agent-skills
 /plugin install extract-design-system@nathanonn-agent-skills
 ```
@@ -193,6 +202,9 @@ also available as slash commands:
 
 # Handoff-doc: give it a destination path to capture where things stand
 /handoff-doc Write a handoff to notes/handoff/20260623_01_auth-refactor.md
+
+# Xquik: plan an API, MCP, or webhook workflow
+/xquik Build an X account monitoring workflow with webhooks
 
 # Extract-design-md: point it at a site URL for a token-only DESIGN.md
 /extract-design-md https://linear.app

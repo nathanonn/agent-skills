@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "xquik",
+  "displayName": "Xquik",
+  "version": "1.0.0",
+  "description": "Plan and implement Xquik REST API, MCP, webhook, and X data automation workflows.",
+  "author": {
+    "name": "Xquik",
+    "url": "https://xquik.com"
+  },
+  "repository": "https://github.com/nathanonn/agent-skills",
+  "license": "MIT",
+  "keywords": [
+    "xquik",
+    "x",
+    "api",
+    "mcp",
+    "webhooks",
+    "automation",
+    "social-data"
+  ]
+}

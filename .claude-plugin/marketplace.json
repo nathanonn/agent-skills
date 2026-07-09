@@ -124,6 +124,20 @@
       "license": "MIT",
       "keywords": ["design", "design-system", "components", "component-catalog", "design-tokens", "playwright", "frontend"],
       "category": "design"
+    },
+    {
+      "name": "xquik",
+      "displayName": "Xquik",
+      "source": "./plugins/xquik",
+      "description": "Plan and implement Xquik REST API, MCP, webhook, and X data automation workflows.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Xquik",
+        "url": "https://xquik.com"
+      },
+      "license": "MIT",
+      "keywords": ["xquik", "x", "api", "mcp", "webhooks", "automation", "social-data"],
+      "category": "data"
     }
   ]
 }
