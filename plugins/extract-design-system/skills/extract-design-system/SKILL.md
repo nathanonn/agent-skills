@@ -141,7 +141,7 @@ Layout (see `references/output-bundle-spec.md` for the full spec — read it bef
 ```
 <out>/
 ├── DESIGN.md                    # ≤300 lines; extract-design-md prose + `## Component Catalog` table
-├── AGENTS.md                    # consumption protocol (imperative steps; template in `references/output-bundle-spec.md`)
+├── AGENTS.md                    # consumption protocol (6 imperative steps; template in `references/output-bundle-spec.md`)
 ├── components/COMPONENTS.md     # ~15-line contracts: anatomy, variants×states, usage, screenshots
 ├── components/*.html + gallery.html
 ├── tokens/design-tokens.json    # DTCG export
