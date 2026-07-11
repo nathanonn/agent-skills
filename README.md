@@ -104,6 +104,18 @@ The superset of `extract-design-md`. Where that skill hands you a token-only `DE
 
 > **Prerequisites:** [playwright-cli](https://github.com/microsoft/playwright-cli) on `PATH` (`npm install -g @playwright/cli@latest` then `playwright-cli install --skills`, needs Node.js 18+), a reachable [Firecrawl](https://github.com/mendableai/firecrawl) instance for page discovery (falls back to playwright link discovery if absent), and `npx` for the on-demand `@google/design.md` linter (skipped gracefully if unavailable).
 
+### design-system-to-skill
+
+**Convert an `extract-design-system` bundle into a reusable, auto-triggering per-brand skill.**
+
+The natural sequel to `extract-design-system`. That skill captures a site's design system into a `.design_systems/<domain>-YYYYMMDD/` bundle; this one packages that bundle into a self-contained skill so any later session builds pages native to the brand just by describing the task — no more pointing the agent at an `AGENTS.md` by hand. A bundled zero-dependency Node worker does all the mechanical work (validate against the bundle contract, detect the variant, copy tokens/components/snippets, render the skill body, stage the tree) and emits a manifest; the agent authors only the generated skill's trigger description. The source bundle's prose is treated as untrusted DATA — it never enters the generated skill's instructions, only its reference files.
+
+**Supports:** full and no-screenshots bundles, an optional MUST-USE mode (make one brand the sole, always-on design system for a project via a managed `CLAUDE.md` block with a single-winner guarantee), collision handling (overwrite / dated-sibling), and a `--dry-run` validation pass.
+
+**Trigger:** "turn this design system into a skill", "make a skill from the extracted design system", "convert `.design_systems/<x>` into an agent skill", "package this bundle as a skill", "generate a &lt;brand&gt; design-system skill".
+
+> **Built for Claude Code.** The worker runs anywhere with Node.js 18+, but its output is a Claude Code skill package (`.claude/skills/<slug>/`) and the optional MUST-USE mode edits a project `CLAUDE.md`. Pairs with `extract-design-system`, which produces the input bundle.
+
 ---
 
 ## Installation
@@ -153,6 +165,7 @@ For Claude Code, you can also install the packaged plugin versions:
 /plugin install handoff-doc@nathanonn-agent-skills
 /plugin install extract-design-md@nathanonn-agent-skills
 /plugin install extract-design-system@nathanonn-agent-skills
+/plugin install design-system-to-skill@nathanonn-agent-skills
 ```
 
 ### Manual installation
@@ -199,6 +212,9 @@ also available as slash commands:
 
 # Extract-design-system: point it at a site URL for the full component bundle
 /extract-design-system https://linear.app
+
+# Design-system-to-skill: point it at a bundle extract-design-system produced
+/design-system-to-skill Convert .design_systems/linear-app-20260101 into a skill
 ```
 
 ---

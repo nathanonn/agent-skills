@@ -1,0 +1,89 @@
+{
+  "$comment": "Expected-contract manifest for extract-design-system output bundles. The converter validates a bundle's structure against this file and records the observed extractor marker. Update recognizedMarkers when a new, verified-compatible extractor version ships; add to incompatibleMarkers only for a version documented as breaking. DESIGN.md front-matter `version:` is the design-system CONTENT version and is NOT the contract marker.",
+  "contractName": "extract-design-system-bundle",
+  "contractRevision": 1,
+  "marker": {
+    "field": "meta.extractorVersion",
+    "source": "eval/fixtures.json",
+    "recognized": ["0.3.0-phaseC"],
+    "incompatible": [],
+    "onMissing": "warn",
+    "onUnknownOrNewer": "warn-degrade",
+    "onIncompatible": "hard-fail"
+  },
+  "canonicalPaths": {
+    "required": [
+      "DESIGN.md",
+      "AGENTS.md",
+      "components/COMPONENTS.md",
+      "tokens/design-tokens.json",
+      "eval/fixtures.json"
+    ],
+    "requiredGlobs": [
+      { "glob": "components/*.html", "minCount": 1, "excluding": ["components/gallery.html"] }
+    ],
+    "optional": [
+      "eval/checklists.md",
+      "components/gallery.html",
+      "screenshots/",
+      "raw/",
+      "design-system.full.md"
+    ],
+    "excludedFromOutput": [
+      "raw/",
+      "components/gallery.html",
+      "design-system.full.md"
+    ],
+    "screenshotsOnlyWithFlag": "screenshots/"
+  },
+  "identityMetadata": {
+    "brandName":       { "primary": "DESIGN.md#frontmatter.name",        "fallback": "folderDomainSegment.titleCase" },
+    "description":     { "primary": "DESIGN.md#frontmatter.description",  "fallback": "DESIGN.md#firstOverviewSentence" },
+    "sourceUrl":       { "primary": "eval/fixtures.json#meta.source",     "fallback": "AGENTS.md#titleLine | https://<domain>" },
+    "extractedDate":   { "primary": "eval/fixtures.json#meta.extracted",  "fallback": "folderName.YYYYMMDDsuffix" },
+    "domainSlugSeed":  { "primary": "folderName.domainPrefix.dotsToHyphens", "fallback": "meta.source.host" },
+    "extractorMarker": { "primary": "eval/fixtures.json#meta.extractorVersion", "fallback": null },
+    "contentVersion":  { "primary": "DESIGN.md#frontmatter.version", "note": "provenance only; never used as identity or contract check" }
+  },
+  "tokens": {
+    "file": "tokens/design-tokens.json",
+    "allowedTopLevelBuckets": ["color", "dimension", "font", "shadow"],
+    "metadataKeyPrefix": "$",
+    "dtcgLeafRequires": ["$type", "$value"],
+    "note": "Top-level keys are either an allowed bucket or a `$`-prefixed metadata key (e.g. $description). Anything else is DTCG shape drift -> WARN, never hard-fail; tokens are still copied verbatim."
+  },
+  "variants": {
+    "full": {
+      "detect": "all canonical dirs present; >=1 components/*.html present and catalogued",
+      "requires": ["DESIGN.md", "AGENTS.md", "components/COMPONENTS.md", "components/*.html>=1", "tokens/design-tokens.json", "eval/fixtures.json"],
+      "class": "first-class",
+      "warn": false
+    },
+    "no-screenshots": {
+      "detect": "screenshots/ absent or empty; otherwise full",
+      "requires": ["DESIGN.md", "AGENTS.md", "components/COMPONENTS.md", "components/*.html>=1", "tokens/design-tokens.json", "eval/fixtures.json"],
+      "class": "first-class",
+      "warn": false,
+      "note": "screenshots-absent is the source default; no warning"
+    },
+    "components-only": {
+      "detect": "components + tokens + DESIGN present but AGENTS.md and/or eval/* missing; catalog+snippets regenerated",
+      "requires": ["DESIGN.md", "components/COMPONENTS.md", "components/*.html>=1", "tokens/design-tokens.json"],
+      "class": "best-effort",
+      "warn": true,
+      "warnMessage": "components-only bundle: prose/tokens may be reused from a prior run; proceeding best-effort"
+    },
+    "single-file": {
+      "detect": "design-system.full.md present at bundle root",
+      "requires": ["DESIGN.md", "AGENTS.md", "components/COMPONENTS.md", "components/*.html>=1", "tokens/design-tokens.json", "eval/fixtures.json"],
+      "class": "best-effort",
+      "warn": true,
+      "warnMessage": "single-file bundle: building from canonical split files; design-system.full.md is ignored as a copy source to avoid double-embedding"
+    },
+    "unsupported": {
+      "detect": "no supported variant matches (e.g. tokens-only with zero component snippets)",
+      "class": "hard-fail",
+      "failMessage": "not a component bundle: no supported variant matched (missing component snippets/catalog)"
+    }
+  }
+}

@@ -124,6 +124,19 @@
       "license": "MIT",
       "keywords": ["design", "design-system", "components", "component-catalog", "design-tokens", "playwright", "frontend"],
       "category": "design"
+    },
+    {
+      "name": "design-system-to-skill",
+      "displayName": "Design System to Skill",
+      "source": "./plugins/design-system-to-skill",
+      "description": "Convert an extract-design-system output bundle into a self-contained, auto-triggering per-brand Claude Code skill that later agents use to build pages native to that brand.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Onn"
+      },
+      "license": "MIT",
+      "keywords": ["design", "design-system", "design-tokens", "components", "skill-generator", "claude-code"],
+      "category": "design"
     }
   ]
 }

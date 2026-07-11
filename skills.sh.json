@@ -29,8 +29,8 @@
     },
     {
       "title": "Design",
-      "description": "Skills for capturing and reverse-engineering a site's visual design system.",
-      "skills": ["extract-design-md", "extract-design-system"]
+      "description": "Skills for capturing, reverse-engineering, and packaging a site's visual design system for reuse.",
+      "skills": ["extract-design-md", "extract-design-system", "design-system-to-skill"]
     }
   ]
 }
