@@ -1,0 +1,9 @@
+{
+  "name": "plugin-prototype",
+  "private": true,
+  "description": "THROWAWAY prototype. Not production code. No dependencies, no build step — this file exists only to alias the static server command.",
+  "scripts": {
+    "start": "python3 -m http.server 4174",
+    "serve": "python3 -m http.server 4174"
+  }
+}

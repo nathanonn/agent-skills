@@ -1,0 +1,54 @@
+NOTICE
+======
+
+This repository is licensed under the MIT License (see LICENSE), Copyright (c)
+2026 Nathan Onn. One skill in it is derived from third-party MIT-licensed work
+and carries the notice below.
+
+prototype-wp
+------------
+
+`plugins/prototype-wp/skills/prototype-wp/` (mirrored at `skills/prototype-wp/`)
+is derived from Matt Pocock's `prototype` skill — https://github.com/mattpocock/skills,
+`skills/engineering/prototype/`.
+
+Carried over from that skill:
+
+- The verbatim opening sentence "A prototype is throwaway code that answers a
+  question." (SKILL.md).
+- A near-verbatim heading and rule, "Skip the polish — no tests, no
+  abstractions, no error handling beyond what keeps the prototype runnable"
+  (BUILD.md).
+- A near-verbatim rule in the Capture section, "A prototype normally lands on a
+  throwaway branch out of `main`, with a context pointer on the implementation
+  issue; `main` keeps only the validated decision" (OUTPUTS.md), which tracks
+  upstream rule 6 clause for clause.
+- Derived framing and rules: throwaway-from-day-one and marked as such, one
+  command to run, in-memory state with no persistence, and surface the full
+  relevant state after every action.
+
+Original to this repository (not derived): the twelve-phase build, the
+spine/overlay/engine split, the WordPress/WooCommerce asset kit, the driver
+panel, and the two-pass verification.
+
+MIT License
+
+Copyright (c) 2026 Matt Pocock
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

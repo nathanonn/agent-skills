@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "prototype-wp",
+  "displayName": "Prototype WordPress Plugin",
+  "version": "1.0.0",
+  "description": "Prototype a WordPress or WooCommerce plugin from its written spec as a runnable offline browser simulation, so the spec can be evaluated as a product before any PHP is written.",
+  "author": {
+    "name": "Nathan Onn",
+    "url": "https://github.com/nathanonn"
+  },
+  "repository": "https://github.com/nathanonn/agent-skills",
+  "license": "MIT",
+  "keywords": ["wordpress", "woocommerce", "prototype", "simulation", "spec", "admin-ui"]
+}

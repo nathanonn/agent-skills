@@ -137,6 +137,19 @@
       "license": "MIT",
       "keywords": ["design", "design-system", "design-tokens", "components", "skill-generator", "claude-code"],
       "category": "design"
+    },
+    {
+      "name": "prototype-wp",
+      "displayName": "Prototype WordPress Plugin",
+      "source": "./plugins/prototype-wp",
+      "description": "Prototype a WordPress or WooCommerce plugin from its written spec as a runnable offline browser simulation, so the spec can be evaluated as a product before any PHP is written.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Onn"
+      },
+      "license": "MIT",
+      "keywords": ["wordpress", "woocommerce", "prototype", "simulation", "spec", "admin-ui"],
+      "category": "development"
     }
   ]
 }

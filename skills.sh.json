@@ -31,6 +31,11 @@
       "title": "Design",
       "description": "Skills for capturing, reverse-engineering, and packaging a site's visual design system for reuse.",
       "skills": ["extract-design-md", "extract-design-system", "design-system-to-skill"]
+    },
+    {
+      "title": "Prototyping",
+      "description": "Skills for building throwaway, runnable prototypes that test a spec before it is implemented.",
+      "skills": ["prototype-wp"]
     }
   ]
 }

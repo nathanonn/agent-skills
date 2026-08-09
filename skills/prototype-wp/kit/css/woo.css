@@ -1,0 +1,95 @@
+/* ==========================================================================
+   PROTOTYPE KIT — WooCommerce chrome. Layer B (overlay): true for the family
+   of plugins that extend WooCommerce, not for WordPress generally.
+   Load after wp-admin.css. Delete this file when there is no host plugin.
+   Throwaway prototype code. Not production.
+   ========================================================================== */
+
+:root {
+  --wc-purple: #7f54b3;
+  --wc-purple-dark: #6b4595;
+}
+
+/* --------------------------------------------- WooCommerce settings screen */
+.woo-settings-header {
+  background: #fff;
+  border-bottom: 1px solid #dcdcde;
+  margin: -10px -20px 0;
+  padding: 0 20px;
+}
+.woo-settings-header h1 { font-size: 20px; font-weight: 600; margin: 0; padding: 16px 0 12px; }
+
+.woo-section-title { font-size: 14px; font-weight: 600; margin: 24px 0 0; }
+
+.woo-card {
+  background: #fff;
+  border: 1px solid #dcdcde;
+  border-radius: 4px;
+  margin: 10px 0 22px;
+  padding: 4px 20px;
+  box-shadow: 0 1px 1px rgba(0,0,0,.03);
+}
+.woo-card > h2 {
+  font-size: 14px; font-weight: 600;
+  margin: 16px 0 4px; padding-bottom: 10px;
+  border-bottom: 1px solid #f0f0f1;
+}
+.woo-card > h2 .woo-card-sub {
+  display: block; font-weight: 400; font-size: 12px;
+  color: var(--wp-muted); margin-top: 4px;
+}
+
+/* ------------------------------------------------- product data metabox */
+.wc-product-data { display: flex; min-height: 200px; }
+.wc-product-data .wc-tabs {
+  list-style: none; margin: 0; padding: 0;
+  width: 160px; flex: none;
+  background: #f6f7f7; border-right: 1px solid #dcdcde;
+}
+.wc-product-data .wc-tabs li a {
+  display: block; padding: 10px 12px; color: var(--wp-blue); font-size: 13px; border-bottom: 1px solid #eee;
+}
+.wc-product-data .wc-tabs li.active a {
+  background: #fff; color: var(--wp-text); font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--wc-purple);
+}
+.wc-product-data .panel { flex: 1; padding: 12px 16px; min-width: 0; }
+.wc-product-data .options_group { border-bottom: 1px solid #f0f0f1; padding: 10px 0; }
+.wc-product-data .options_group:last-child { border-bottom: 0; }
+.wc-product-data label { display: inline-block; min-width: 140px; font-size: 13px; }
+.product-type-select { padding: 8px 12px; border-bottom: 1px solid #dcdcde; background: #f6f7f7; font-size: 13px; }
+
+/* ------------------------------------------------------------- variations */
+.variation-row {
+  border: 1px solid #dcdcde; background: #fdfdfd;
+  margin-bottom: 8px; padding: 10px; border-radius: 3px;
+  display: flex; gap: 12px; align-items: center;
+}
+.variation-row img {
+  width: 56px; height: 56px; object-fit: contain;
+  background: #f6f7f7; border: 1px solid #dcdcde; border-radius: 3px;
+}
+.variation-row .variation-meta { flex: 1; min-width: 0; }
+.variation-row .variation-title { font-weight: 600; font-size: 13px; }
+
+/* --------------------------------------- native product image side boxes */
+/* The stock WooCommerce featured-image and gallery boxes. Keep them visible
+   next to anything a plugin adds: what the plugin writes back into them is
+   usually where synchronisation rules become observable. */
+.native-image-box .native-featured {
+  width: 100%; aspect-ratio: 1/1; object-fit: contain;
+  background: #f6f7f7; border: 1px solid #dcdcde; border-radius: 3px;
+}
+.native-gallery-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; }
+.native-gallery-grid img {
+  width: 100%; aspect-ratio: 1/1; object-fit: contain;
+  background: #f6f7f7; border: 1px solid #dcdcde; border-radius: 3px;
+}
+.native-empty {
+  border: 1px dashed var(--wp-border); border-radius: 3px; padding: 18px 10px;
+  text-align: center; color: var(--wp-muted); font-size: 12px; background: #fafafa;
+}
+.sync-note {
+  font-size: 12px; color: var(--wp-muted); margin-top: 10px;
+  padding-top: 8px; border-top: 1px solid #f0f0f1;
+}

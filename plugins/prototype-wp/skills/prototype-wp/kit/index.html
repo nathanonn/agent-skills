@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- PROTOTYPE KIT — the document shell: mount points and script order.
+     Throwaway prototype code. Not production. -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Replace "WordPress plugin" with the plugin's name. -->
+<title>PROTOTYPE — WordPress plugin</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232271b1'/><rect x='8' y='10' width='16' height='4' rx='1' fill='white'/><rect x='8' y='18' width='10' height='4' rx='1' fill='white' opacity='.75'/></svg>">
+
+<link rel="stylesheet" href="assets/css/wp-admin.css">
+<!-- overlay: delete when there is no host plugin -->
+<link rel="stylesheet" href="assets/css/woo.css">
+<!-- plugin-specific stylesheets go last -->
+</head>
+<body>
+
+<!-- Mount points. The kit looks these up by id; renaming them breaks it. -->
+<div id="wpadminbar"></div>
+<div id="app"></div>
+<div id="modal-root"></div>
+<div id="driver-panel"></div>
+
+<!-- Load order is a dependency order, not a preference.
+     Kit spine first, then fixtures, then the domain engine, then screens,
+     and the boot file last because it renders. -->
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/wp.js"></script>
+<script src="assets/js/chrome.js"></script>
+<script src="assets/js/router.js"></script>
+<script src="assets/js/devpanel.js"></script>
+
+<!-- Prototype scripts. None of these exist in a fresh copy of the kit, so they
+     are commented out: a stock copy must boot without a single 404. Uncomment
+     each line as you create the file.
+
+<script src="assets/js/data.js"></script>    fixtures: the simulated install
+<script src="assets/js/core.js"></script>    domain engine: DOM-free
+<script src="assets/js/admin.js"></script>   screens
+<script src="assets/js/app.js"></script>     configure + start
+-->
+
+<script>
+/* Placeholder boot — delete this block once app.js calls Router.start().
+   Without it a fresh copy of the kit is a blank page, which reads as a broken
+   asset path rather than as work not started yet. */
+(function () {
+  var app = document.getElementById('app');
+  if (app.firstChild) return;   // a boot file already rendered
+  document.getElementById('wpadminbar').appendChild(
+    UI.h('a.ab-item.is-logo', { href: '#/' }, '▣ Prototype'));
+  app.appendChild(UI.h('div.wp-admin-wrap', UI.h('div#wpbody',
+    UI.h('div.wrap',
+      UI.h('h1.wp-heading-inline', 'Prototype kit'),
+      UI.h('hr.wp-header-end'),
+      UI.notice('info', 'The kit spine is loaded and no prototype scripts are wired up yet. ' +
+        'Add assets/js/data.js, core.js, the screens and app.js, then uncomment them above.',
+        { dismissible: false })))));
+})();
+</script>
+
+</body>
+</html>
