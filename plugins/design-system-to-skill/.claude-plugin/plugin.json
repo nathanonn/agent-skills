@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "design-system-to-skill",
+  "displayName": "Design System to Skill",
+  "version": "1.0.0",
+  "description": "Convert an extract-design-system output bundle into a self-contained, auto-triggering per-brand Claude Code skill that later agents use to build pages native to that brand.",
+  "author": {
+    "name": "Nathan Onn",
+    "url": "https://github.com/nathanonn"
+  },
+  "repository": "https://github.com/nathanonn/agent-skills",
+  "license": "MIT",
+  "keywords": ["design", "design-system", "design-tokens", "components", "skill-generator", "claude-code"]
+}
