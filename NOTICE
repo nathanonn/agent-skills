@@ -2,8 +2,8 @@ NOTICE
 ======
 
 This repository is licensed under the MIT License (see LICENSE), Copyright (c)
-2026 Nathan Onn. One skill in it is derived from third-party MIT-licensed work
-and carries the notice below.
+2026 Nathan Onn. Two skills in it involve third-party licensed work and carry
+the notices below.
 
 prototype-wp
 ------------
@@ -52,3 +52,18 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+validate-block-markup
+---------------------
+
+`plugins/validate-block-markup/skills/validate-block-markup/` (mirrored at
+`skills/validate-block-markup/`) is original work, licensed MIT like the rest of
+this repository. No third-party code is distributed with it.
+
+On its first run the skill installs a pinned Node.js runtime into its own
+`node_modules/` directory — about 350 packages, roughly 545 MB. Most of that
+(about 331 MB) is `@wordpress/*` packages, which are licensed GPL-2.0-or-later.
+Those packages are fetched from the npm registry at run time on the user's
+machine; none of them are contained in, distributed by, or linked into this
+repository, and the skill's own code — `lib/validator.cjs` and
+`scripts/validate-block-markup.cjs` — remains MIT.

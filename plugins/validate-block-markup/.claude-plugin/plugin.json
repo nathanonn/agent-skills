@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "validate-block-markup",
+  "displayName": "Validate Block Markup",
+  "version": "1.0.0",
+  "description": "Validate, diagnose, or repair standalone serialized WordPress Gutenberg block markup against the core block library running in Node.js, treating structural validity and cross-site portability as separate verdicts.",
+  "author": {
+    "name": "Nathan Onn",
+    "url": "https://github.com/nathanonn"
+  },
+  "repository": "https://github.com/nathanonn/agent-skills",
+  "license": "MIT",
+  "keywords": ["wordpress", "gutenberg", "blocks", "validation", "portability", "block-markup"]
+}

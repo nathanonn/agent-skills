@@ -36,6 +36,11 @@
       "title": "Prototyping",
       "description": "Skills for building throwaway, runnable prototypes that test a spec before it is implemented.",
       "skills": ["prototype-wp"]
+    },
+    {
+      "title": "Validation",
+      "description": "Skills for checking generated artifacts against a real implementation before they ship.",
+      "skills": ["validate-block-markup"]
     }
   ]
 }

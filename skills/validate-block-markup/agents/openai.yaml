@@ -1,0 +1,4 @@
+interface:
+  display_name: "Validate Block Markup"
+  short_description: "Validate portable WordPress core block markup"
+  default_prompt: "Use $validate-block-markup to validate this serialized WordPress core block markup."

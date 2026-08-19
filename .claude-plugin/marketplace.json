@@ -150,6 +150,19 @@
       "license": "MIT",
       "keywords": ["wordpress", "woocommerce", "prototype", "simulation", "spec", "admin-ui"],
       "category": "development"
+    },
+    {
+      "name": "validate-block-markup",
+      "displayName": "Validate Block Markup",
+      "source": "./plugins/validate-block-markup",
+      "description": "Validate, diagnose, or repair standalone serialized WordPress Gutenberg block markup against the core block library running in Node.js, treating structural validity and cross-site portability as separate verdicts.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Onn"
+      },
+      "license": "MIT",
+      "keywords": ["wordpress", "gutenberg", "blocks", "validation", "portability", "block-markup"],
+      "category": "development"
     }
   ]
 }
