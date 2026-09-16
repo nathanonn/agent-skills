@@ -163,6 +163,19 @@
       "license": "MIT",
       "keywords": ["wordpress", "gutenberg", "blocks", "validation", "portability", "block-markup"],
       "category": "development"
+    },
+    {
+      "name": "wp-credential-guard",
+      "displayName": "WP Credential Guard",
+      "source": "./plugins/wp-credential-guard",
+      "description": "Masks WordPress usernames and Application Passwords in prompts with session-scoped placeholders, and restores them into Bash commands at execution time.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Onn"
+      },
+      "license": "MIT",
+      "keywords": ["wordpress", "credentials", "application-password", "redaction", "hooks", "security"],
+      "category": "development"
     }
   ]
 }
