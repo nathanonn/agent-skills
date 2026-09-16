@@ -10,12 +10,7 @@
     {
       "title": "Codex /goal",
       "description": "Skills that produce Codex /goal-ready implementation bundles.",
-      "skills": [
-        "cli-spec-to-goal",
-        "webg-spec-to-goal",
-        "wp-spec-to-goal",
-        "wp-requirements-to-goals"
-      ]
+      "skills": ["cli-spec-to-goal", "webg-spec-to-goal"]
     },
     {
       "title": "Media",
@@ -33,14 +28,15 @@
       "skills": ["extract-design-md", "extract-design-system", "design-system-to-skill"]
     },
     {
-      "title": "Prototyping",
-      "description": "Skills for building throwaway, runnable prototypes that test a spec before it is implemented.",
-      "skills": ["prototype-wp"]
-    },
-    {
-      "title": "Validation",
-      "description": "Skills for checking generated artifacts against a real implementation before they ship.",
-      "skills": ["validate-block-markup"]
+      "title": "WordPress",
+      "description": "Skills for specifying, prototyping, validating, and shipping WordPress work — from a plugin spec through to block markup landing on a live site.",
+      "skills": [
+        "wp-spec-to-goal",
+        "wp-requirements-to-goals",
+        "prototype-wp",
+        "validate-block-markup",
+        "wp-rest-api"
+      ]
     }
   ]
 }
