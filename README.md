@@ -144,6 +144,38 @@ Answers two separate questions about a `<!-- wp:... -->` blob: does it parse and
 
 ---
 
+## Plugins
+
+Everything above is a **skill** — a Markdown instruction file any agent can read. This section is
+for the one entry that is not: a Claude Code **hooks plugin**, which runs code against the engine's
+events. Hooks have no equivalent in Codex, Cursor or GitHub Copilot, so a plugin listed here
+installs through the Claude Code marketplace only and does not appear under `skills/`.
+
+### wp-credential-guard
+
+**Keeps a WordPress username and Application Password out of the model's context while still letting `curl` receive the real bytes.**
+
+You paste a credential into the conversation because the work needs it; the model reads a
+session-scoped placeholder like `[WP-PASS-9a1f]` instead. When the model writes a Bash command
+using that placeholder, the real value is substituted back in — shell-quoted for the context it
+lands in — so the shell gets the credential and the transcript does not. The mapping lives in
+module memory, dies with the session, and is never written to disk. A placeholder the vault has
+never held denies the Bash call rather than running it with literal text.
+
+**Covers:** `-u user:pass` in every quoting combination, `--user=`, URL userinfo, labelled forms
+with and without a separator, a bare six-group Application Password, and the space-stripped
+24-character form. Shell references like `$WP_APP_PASSWORD` pass through untouched.
+
+**Read the limitations before trusting it.** The on-screen rewrite is cosmetic, a plugin that is
+present but not loaded fails silently, and slash commands are refused rather than masked. The
+plugin's own [README](plugins/wp-credential-guard/README.md) front-loads all of it, and
+[VERIFICATION.md](plugins/wp-credential-guard/VERIFICATION.md) is a five-check routine for
+confirming it works on your machine.
+
+> **Requires:** Claude Code with plugin hook support. Node for the test suite (`node tests/hooks.test.mjs` — no dependencies, no build step).
+
+---
+
 ## Installation
 
 These skills install two ways. Pick whichever matches your agent.
@@ -194,6 +226,7 @@ For Claude Code, you can also install the packaged plugin versions:
 /plugin install design-system-to-skill@nathanonn-agent-skills
 /plugin install prototype-wp@nathanonn-agent-skills
 /plugin install validate-block-markup@nathanonn-agent-skills
+/plugin install wp-credential-guard@nathanonn-agent-skills
 ```
 
 ### Manual installation
@@ -209,6 +242,14 @@ cp -r agent-skills/plugins/ask-first .claude/plugins/ask-first
 # (e.g. Codex: ~/.codex/skills/ — see your agent's docs for the path)
 cp -r agent-skills/skills/ask-first <your-agent-skills-dir>/ask-first
 ```
+
+> **Hooks plugins need one more step.** Copying is enough for a skill, but a plugin that ships
+> `hooks/` — currently only `wp-credential-guard` — lands on disk without registering its hooks,
+> and nothing warns you. Either name it in `enabledPlugins` in `~/.claude/settings.json` (or
+> `.claude/settings.json`) and restart, or skip the copy and load it directly with
+> `claude --plugin-dir agent-skills/plugins/wp-credential-guard`. Run `/hooks` afterwards to
+> confirm the events are registered. See the
+> [plugin's own README](plugins/wp-credential-guard/README.md#install) for the detail.
 
 ---
 
@@ -261,6 +302,7 @@ agent-skills/
     <name>/SKILL.md       # generated mirror — do not hand-edit
   plugins/                # Claude Code plugin marketplace (single source of truth)
     <name>/skills/<name>/SKILL.md
+    <name>/hooks/         # hooks plugins — Claude Code only, never mirrored
   .claude-plugin/         # marketplace manifest
   skills.sh.json          # skills.sh page grouping (display only)
   sync-skills.sh          # regenerates skills/ from plugins/
@@ -269,6 +311,10 @@ agent-skills/
 `plugins/` is the **single source of truth**. The root `skills/` directory is a
 generated mirror that exists so the Agent Skills CLI and non-Claude agents get a
 clean `skills/<name>/SKILL.md` discovery path.
+
+A plugin that ships `hooks/` rather than `skills/` is Claude-Code-only and has nothing to mirror,
+so `sync-skills.sh` skips it by design — it globs `plugins/*/skills/*`. A hooks plugin missing
+from `skills/` is correct, not a sync failure.
 
 ### Contributing — keep the mirror in sync
 

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "wp-credential-guard",
+  "displayName": "WP Credential Guard",
+  "version": "1.0.0",
+  "description": "Masks WordPress usernames and Application Passwords in prompts with session-scoped placeholders, and restores them into Bash commands at execution time.",
+  "author": {
+    "name": "Nathan Onn",
+    "url": "https://github.com/nathanonn"
+  },
+  "repository": "https://github.com/nathanonn/agent-skills",
+  "license": "MIT",
+  "keywords": ["wordpress", "credentials", "application-password", "redaction", "hooks", "security"]
+}
