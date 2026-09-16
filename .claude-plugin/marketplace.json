@@ -165,6 +165,19 @@
       "category": "development"
     },
     {
+      "name": "wp-rest-api",
+      "displayName": "WP REST API",
+      "source": "./plugins/wp-rest-api",
+      "description": "Push generated block markup, CSS and JS animation into a WordPress site over the core REST API, authenticated with an admin Application Password — curl and jq only, no MCP server, no CLI, no SSH.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Onn"
+      },
+      "license": "MIT",
+      "keywords": ["wordpress", "rest-api", "block-markup", "global-styles", "application-password", "gutenberg"],
+      "category": "development"
+    },
+    {
       "name": "wp-credential-guard",
       "displayName": "WP Credential Guard",
       "source": "./plugins/wp-credential-guard",
