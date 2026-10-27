@@ -159,9 +159,9 @@ Closes the last mile that used to be a copy-paste into the block editor's Code E
 ## Plugins
 
 Everything above is a **skill** — a Markdown instruction file any agent can read. This section is
-for the one entry that is not: a Claude Code **hooks plugin**, which runs code against the engine's
+for the two entries that are not: Claude Code **hooks plugins**, which run code against the engine's
 events. Hooks have no equivalent in Codex, Cursor or GitHub Copilot, so a plugin listed here
-installs through the Claude Code marketplace only and does not appear under `skills/`.
+installs through the Claude Code marketplace only. Neither is mirrored under `skills/`, with one exception: the `handoff-doc` skill bundled inside `context-alert` (see below).
 
 ### wp-credential-guard
 
@@ -185,6 +185,18 @@ plugin's own [README](plugins/wp-credential-guard/README.md) front-loads all of 
 confirming it works on your machine.
 
 > **Requires:** Claude Code with plugin hook support. Node for the test suite (`node tests/hooks.test.mjs` — no dependencies, no build step).
+
+### context-alert
+
+**Asks whether to write a handoff doc when your context window gets heavy.**
+
+When the main session's context passes **40% of the window or 300k tokens, whichever comes first**, it opens the AskUserQuestion dialog at the end of the turn, never mid-turn. The options are "Handoff, then compact", "Handoff only", "Compact now" and "Not now". After "Not now" it asks again every +15 percentage points or +150k tokens. Any compaction resets it to the first threshold. It watches the main session only, so sub-agent turns never trigger it, and it is designed not to block background agents. `/context-alert` shows or changes the settings.
+
+**Beta.** Version 0.1.0. The core flow is verified live; some live tests are still pending. The plugin's [README](plugins/context-alert/README.md) lists the known limits.
+
+It bundles its own copy of the `handoff-doc` skill, which must stay identical to the one under `plugins/handoff-doc/`. That copy is the only part of the plugin that has a counterpart under `skills/`.
+
+> **Requires:** Claude Code with function-hooks (mod) support. Tests run with `claude plugin test plugins/context-alert`.
 
 ---
 
@@ -240,6 +252,7 @@ For Claude Code, you can also install the packaged plugin versions:
 /plugin install validate-block-markup@nathanonn-agent-skills
 /plugin install wp-rest-api@nathanonn-agent-skills
 /plugin install wp-credential-guard@nathanonn-agent-skills
+/plugin install context-alert@nathanonn-agent-skills
 ```
 
 ### Manual installation
@@ -257,12 +270,17 @@ cp -r agent-skills/skills/ask-first <your-agent-skills-dir>/ask-first
 ```
 
 > **Hooks plugins need one more step.** Copying is enough for a skill, but a plugin that ships
-> `hooks/` — currently only `wp-credential-guard` — lands on disk without registering its hooks,
-> and nothing warns you. Either name it in `enabledPlugins` in `~/.claude/settings.json` (or
-> `.claude/settings.json`) and restart, or skip the copy and load it directly with
-> `claude --plugin-dir agent-skills/plugins/wp-credential-guard`. Run `/hooks` afterwards to
-> confirm the events are registered. See the
-> [plugin's own README](plugins/wp-credential-guard/README.md#install) for the detail.
+> `hooks/` — currently `wp-credential-guard` and `context-alert` — lands on disk without
+> registering its hooks, and nothing warns you. Either enable it in `enabledPlugins` in
+> `~/.claude/settings.json` (or `.claude/settings.json`), an object keyed `"<name>@<marketplace>": true`
+> rather than an array, and restart, or skip the copy and load it
+> directly with `claude --plugin-dir agent-skills/plugins/<name>`. Run `/hooks` afterwards to
+> confirm the events are registered (for `context-alert`, run `/context-alert` instead: function-hook
+> mods may not show in `/hooks`). See the
+> [wp-credential-guard README](plugins/wp-credential-guard/README.md#install) for the detail.
+> For `context-alert`, the marketplace install above is the supported route (choose user scope,
+> then `/reload-plugins`); do not also start a session with `--plugin-dir` pointing at it, or it
+> loads twice.
 
 ---
 
@@ -330,7 +348,9 @@ clean `skills/<name>/SKILL.md` discovery path.
 
 A plugin that ships `hooks/` rather than `skills/` is Claude-Code-only and has nothing to mirror,
 so `sync-skills.sh` skips it by design — it globs `plugins/*/skills/*`. A hooks plugin missing
-from `skills/` is correct, not a sync failure.
+from `skills/` is correct, not a sync failure. The one exception is `context-alert`, which bundles
+a copy of the `handoff-doc` skill; that copy mirrors to the same `skills/handoff-doc/` as the
+standalone plugin, so the two copies must stay byte-identical. `sync-skills.sh` enforces this: when two plugins ship a same-named skill whose bytes differ, both `--check` and the regenerate run fail with an error instead of letting the last copy win.
 
 ### Contributing — keep the mirror in sync
 
@@ -338,7 +358,7 @@ Edit skills under `plugins/<name>/skills/<name>/`, then regenerate the mirror:
 
 ```bash
 ./sync-skills.sh            # rebuild skills/ from plugins/
-./sync-skills.sh --check    # verify skills/ matches plugins/ (CI-friendly)
+./sync-skills.sh --check    # verify skills/ matches plugins/ and same-named skills are identical (CI-friendly)
 ```
 
 Never hand-edit files under `skills/` — they are overwritten on every sync.

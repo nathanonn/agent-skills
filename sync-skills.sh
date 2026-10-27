@@ -10,6 +10,9 @@
 # To avoid maintaining two hand-edited copies, plugins/ is the SINGLE SOURCE OF
 # TRUTH and this script regenerates skills/ from it. Never hand-edit skills/.
 #
+# Two plugins shipping a same-named skill must keep byte-identical copies;
+# both modes fail if they differ.
+#
 # Usage:
 #   ./sync-skills.sh           # regenerate skills/ from plugins/
 #   ./sync-skills.sh --check   # verify skills/ is in sync (non-zero exit if not)
@@ -34,6 +37,26 @@ done
 
 if [[ ${#sources[@]} -eq 0 ]]; then
   echo "error: no skills found under $SRC_GLOB" >&2
+  exit 1
+fi
+
+# Two plugins may ship a skill with the same name (context-alert bundles a
+# copy of handoff-doc), but only if the bytes match. Otherwise the last copy
+# would silently win in skills/, so fail in both modes.
+conflict=0
+for ((i = 0; i < ${#sources[@]}; i++)); do
+  for ((j = i + 1; j < ${#sources[@]}; j++)); do
+    if [[ "$(basename "${sources[i]}")" == "$(basename "${sources[j]}")" ]]; then
+      if ! diff -rq "${sources[i]}" "${sources[j]}" >/dev/null 2>&1; then
+        echo "error: duplicate skill '$(basename "${sources[i]}")' differs between ${sources[i]} and ${sources[j]}" >&2
+        diff -rq "${sources[i]}" "${sources[j]}" >&2 || true
+        conflict=1
+      fi
+    fi
+  done
+done
+if [[ "$conflict" -eq 1 ]]; then
+  echo "Make the copies identical, then re-run." >&2
   exit 1
 fi
 
