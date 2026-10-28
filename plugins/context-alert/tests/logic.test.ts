@@ -3,41 +3,42 @@ import {
   DEFAULTS, emptyState, parseSet, mergeConfig, nextThreshold, shouldFire, rearm,
   extractHandoffPath, extractSkillHandoffPath, staleSessionKeys, formatTokens,
   shortPath, questionText, dialogOptions, resetTiers, isMarkdownWrite, shouldToast, handoffPathFromWrite, extractSlashHandoffPath,
-  classifyAskError, isBusyStatus, skillNameOf,
+  classifyAskError, isBusyStatus, skillNameOf, crossed, belowFirst,
 } from '../hooks/logic'
 
+const EITHER = { ...DEFAULTS, trigger: 'either' as const }
 const asked = (pct: number, tokens: number) => ({ asked: [{ pct, tokens, at: 1 }] })
 
 describe('thresholds', () => {
   test('percent fires first on a small window', () => {
-    expect(shouldFire(emptyState(), DEFAULTS, 41, 82000)).toBe(true)
+    expect(shouldFire(emptyState(), EITHER, 41, 82000)).toBe(true)
   })
   test('tokens fire first on a big window', () => {
-    expect(shouldFire(emptyState(), DEFAULTS, 31, 310000)).toBe(true)
+    expect(shouldFire(emptyState(), EITHER, 31, 310000)).toBe(true)
   })
   test('below both stays quiet', () => {
-    expect(shouldFire(emptyState(), DEFAULTS, 39, 299999)).toBe(false)
+    expect(shouldFire(emptyState(), EITHER, 39, 299999)).toBe(false)
   })
   test('undefined figures never fire', () => {
-    expect(shouldFire(emptyState(), DEFAULTS, undefined, 900000)).toBe(false)
-    expect(shouldFire(emptyState(), DEFAULTS, 90, undefined)).toBe(false)
+    expect(shouldFire(emptyState(), EITHER, undefined, 900000)).toBe(false)
+    expect(shouldFire(emptyState(), EITHER, 90, undefined)).toBe(false)
   })
   test('disabled never fires', () => {
-    expect(shouldFire(emptyState(), { ...DEFAULTS, enabled: false }, 90, 900000)).toBe(false)
+    expect(shouldFire(emptyState(), { ...EITHER, enabled: false }, 90, 900000)).toBe(false)
   })
   test('re-asks at +15 points or +150k tokens', () => {
     const s = asked(41, 410000)
     expect(nextThreshold(s, DEFAULTS)).toEqual({ pct: 56, tokens: 560000 })
-    expect(shouldFire(s, DEFAULTS, 55, 500000)).toBe(false)
-    expect(shouldFire(s, DEFAULTS, 56, 500000)).toBe(true)
-    expect(shouldFire(s, DEFAULTS, 50, 560000)).toBe(true)
+    expect(shouldFire(s, EITHER, 55, 500000)).toBe(false)
+    expect(shouldFire(s, EITHER, 56, 500000)).toBe(true)
+    expect(shouldFire(s, EITHER, 50, 560000)).toBe(true)
   })
   test('re-arms after a drop below the first threshold on both measures', () => {
     const s = asked(41, 410000)
-    expect(rearm(s, DEFAULTS, 5, 50000).asked).toEqual([])
-    expect(rearm(s, DEFAULTS, 5, 310000).asked.length).toBe(1)
-    expect(rearm(s, DEFAULTS, 45, 50000).asked.length).toBe(1)
-    expect(rearm(s, DEFAULTS, undefined, undefined).asked.length).toBe(1)
+    expect(rearm(s, EITHER, 5, 50000).asked).toEqual([])
+    expect(rearm(s, EITHER, 5, 310000).asked.length).toBe(1)
+    expect(rearm(s, EITHER, 45, 50000).asked.length).toBe(1)
+    expect(rearm(s, EITHER, undefined, undefined).asked.length).toBe(1)
   })
 })
 
@@ -110,11 +111,11 @@ describe('pruning and labels', () => {
 describe('mid-turn toast', () => {
   test('toasts once per tier and re-arms with the tiers', () => {
     const t = nextThreshold(emptyState(), DEFAULTS)
-    expect(shouldToast(emptyState(), DEFAULTS, 45, 450000)).toBe(true)
+    expect(shouldToast(emptyState(), EITHER, 45, 450000)).toBe(true)
     const toasted = { ...emptyState(), toastedAt: t }
-    expect(shouldToast(toasted, DEFAULTS, 46, 460000)).toBe(false)
-    expect(shouldToast(toasted, { ...DEFAULTS, midTurnToast: false }, 90, 900000)).toBe(false)
-    expect(rearm(toasted, DEFAULTS, 5, 50000).toastedAt).toBeUndefined()
+    expect(shouldToast(toasted, EITHER, 46, 460000)).toBe(false)
+    expect(shouldToast(toasted, { ...EITHER, midTurnToast: false }, 90, 900000)).toBe(false)
+    expect(rearm(toasted, EITHER, 5, 50000).toastedAt).toBeUndefined()
   })
 })
 
@@ -201,5 +202,72 @@ describe('compaction resets the tiers', () => {
     expect(isMarkdownWrite('Write', '/x/a.ts')).toBe(false)
     expect(isMarkdownWrite('Read', '/x/a.md')).toBe(false)
     expect(isMarkdownWrite('Write', undefined)).toBe(false)
+  })
+})
+
+describe('trigger mode', () => {
+  const P = { ...DEFAULTS, percent: 35 }
+  const T = { ...DEFAULTS, trigger: 'tokens' as const }
+  test('default trigger is percent', () => {
+    expect(DEFAULTS.trigger).toBe('percent')
+    expect(mergeConfig(null).trigger).toBe('percent')
+  })
+  test('mergeConfig: missing or invalid trigger reads as percent, valid kept', () => {
+    expect(mergeConfig({ percent: 50 }).trigger).toBe('percent')
+    expect(mergeConfig({ trigger: 'bogus' }).trigger).toBe('percent')
+    expect(mergeConfig({ trigger: 5 }).trigger).toBe('percent')
+    expect(mergeConfig({ trigger: 'tokens' }).trigger).toBe('tokens')
+    expect(mergeConfig({ trigger: 'either' }).trigger).toBe('either')
+  })
+  test('parseSet trigger', () => {
+    expect(parseSet('trigger', 'either')).toEqual({ ok: true, key: 'trigger', value: 'either' })
+    expect(parseSet('trigger', ' tokens ')).toEqual({ ok: true, key: 'trigger', value: 'tokens' })
+    expect(parseSet('trigger', 'percent').ok).toBe(true)
+    expect(parseSet('trigger', 'both').ok).toBe(false)
+  })
+  test('percent mode ignores tokens: 30% / 300k does not fire for percent 35', () => {
+    expect(shouldFire(emptyState(), P, 30, 300000)).toBe(false)
+    expect(shouldFire(emptyState(), P, 35, 10000)).toBe(true)
+  })
+  test('tokens mode ignores percent', () => {
+    expect(shouldFire(emptyState(), T, 90, 100000)).toBe(false)
+    expect(shouldFire(emptyState(), T, 10, 300000)).toBe(true)
+  })
+  test('either fires on whichever is crossed', () => {
+    expect(shouldFire(emptyState(), EITHER, 41, 1000)).toBe(true)
+    expect(shouldFire(emptyState(), EITHER, 1, 300000)).toBe(true)
+    expect(shouldFire(emptyState(), EITHER, 39, 299999)).toBe(false)
+  })
+  test('unknown percent or tokens never fires, in every mode', () => {
+    for (const c of [DEFAULTS, T, EITHER]) {
+      expect(shouldFire(emptyState(), c, undefined, 900000)).toBe(false)
+      expect(shouldFire(emptyState(), c, 90, undefined)).toBe(false)
+    }
+  })
+  test('steps follow the mode', () => {
+    const s = asked(41, 410000) // next: 56% / 560k
+    expect(shouldFire(s, DEFAULTS, 50, 560000)).toBe(false)
+    expect(shouldFire(s, DEFAULTS, 56, 100)).toBe(true)
+    expect(shouldFire(s, T, 90, 559999)).toBe(false)
+    expect(shouldFire(s, T, 1, 560000)).toBe(true)
+    expect(shouldFire(s, EITHER, 50, 560000)).toBe(true)
+  })
+  test('crossed and belowFirst', () => {
+    expect(crossed(DEFAULTS, { pct: 40, tokens: 300000 }, 30, 999999)).toBe(false)
+    expect(belowFirst(DEFAULTS, 30, 999999)).toBe(true)
+    expect(belowFirst(T, 90, 299999)).toBe(true)
+    expect(belowFirst(EITHER, 30, 300000)).toBe(false)
+    expect(belowFirst(EITHER, undefined, 1)).toBe(false)
+  })
+  test('rearm in percent mode ignores tokens', () => {
+    const s = asked(41, 410000)
+    expect(rearm(s, DEFAULTS, 5, 900000).asked).toEqual([])
+    expect(rearm(s, T, 90, 50000).asked).toEqual([])
+    expect(rearm(s, EITHER, 5, 900000).asked.length).toBe(1)
+  })
+  test('shouldToast in percent mode ignores tokens', () => {
+    expect(shouldToast(emptyState(), DEFAULTS, 30, 900000)).toBe(false)
+    expect(shouldToast(emptyState(), DEFAULTS, 41, 1000)).toBe(true)
+    expect(shouldToast(emptyState(), T, 90, 1000)).toBe(false)
   })
 })

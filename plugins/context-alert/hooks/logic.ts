@@ -1,7 +1,11 @@
 // Pure logic for context-alert. No `$` calls here.
 
+export type Trigger = 'percent' | 'tokens' | 'either'
+export const TRIGGERS: readonly Trigger[] = ['percent', 'tokens', 'either']
+
 export type Config = {
   enabled: boolean
+  trigger: Trigger
   percent: number
   tokens: number
   stepPercent: number
@@ -13,6 +17,7 @@ export type Config = {
 
 export const DEFAULTS: Config = {
   enabled: true,
+  trigger: 'percent',
   percent: 40,
   tokens: 300000,
   stepPercent: 15,
@@ -49,6 +54,7 @@ export function mergeConfig(stored: unknown): Config {
       const v = s[k]
       if (typeof v === 'number' && Number.isFinite(v) && v > 0) out[k] = v
     }
+    if (s.trigger === 'percent' || s.trigger === 'tokens' || s.trigger === 'either') out.trigger = s.trigger
     if (s.whenBusy === 'dialog' || s.whenBusy === 'suggest') out.whenBusy = s.whenBusy
   }
   return out
@@ -78,7 +84,11 @@ export function parseSet(key: string, raw: string): SetResult {
     if (value === 'dialog' || value === 'suggest') return { ok: true, key, value }
     return { ok: false, error: `whenBusy takes dialog or suggest, got "${value}"` }
   }
-  const keys = [...BOOL_KEYS, ...NUM_KEYS, 'whenBusy'].join(', ')
+  if (key === 'trigger') {
+    if (value === 'percent' || value === 'tokens' || value === 'either') return { ok: true, key, value }
+    return { ok: false, error: `trigger takes percent, tokens or either, got "${value}"` }
+  }
+  const keys = [...BOOL_KEYS, ...NUM_KEYS, 'trigger', 'whenBusy'].join(', ')
   return { ok: false, error: `unknown key "${key}". Keys: ${keys}` }
 }
 
@@ -90,27 +100,53 @@ export function nextThreshold(state: SessionState, cfg: Config): { pct: number; 
     : { pct: cfg.percent, tokens: cfg.tokens }
 }
 
+/** Is this fill at or past `t`, counting only the measure(s) the trigger mode uses? Both values must be known. */
+export function crossed(
+  cfg: Config,
+  t: { pct: number; tokens: number },
+  percent: number | undefined,
+  tokens: number | undefined,
+): boolean {
+  if (percent === undefined || tokens === undefined) return false
+  const byPercent = percent >= t.pct
+  const byTokens = tokens >= t.tokens
+  if (cfg.trigger === 'percent') return byPercent
+  if (cfg.trigger === 'tokens') return byTokens
+  return byPercent || byTokens
+}
+
+/** Is the fill still below the FIRST threshold, in the active measure(s)? */
+export function belowFirst(cfg: Config, percent: number | undefined, tokens: number | undefined): boolean {
+  if (percent === undefined || tokens === undefined) return false
+  return !crossed(cfg, { pct: cfg.percent, tokens: cfg.tokens }, percent, tokens)
+}
+
+/** A one-line note when a `set` changed the trigger mode. */
+export function triggerNote(trigger: Trigger): string {
+  if (trigger === 'percent') return 'Trigger is now percent only (token limit ignored). Use `/context-alert set trigger either` to use both.'
+  if (trigger === 'tokens') return 'Trigger is now tokens only (percent limit ignored). Use `/context-alert set trigger either` to use both.'
+  return 'Trigger is now either: whichever limit is crossed first.'
+}
+
 export function shouldFire(
   state: SessionState,
   cfg: Config,
   percent: number | undefined,
   tokens: number | undefined,
 ): boolean {
-  if (!cfg.enabled || percent === undefined || tokens === undefined) return false
-  const t = nextThreshold(state, cfg)
-  return percent >= t.pct || tokens >= t.tokens
+  if (!cfg.enabled) return false
+  return crossed(cfg, nextThreshold(state, cfg), percent, tokens)
 }
 
-/** Fill fell below the FIRST threshold on both measures (compact, /clear): clear the tiers. */
+/** Fill fell below the FIRST threshold on the active measure(s) (compact, /clear): clear the tiers. */
 export function rearm(
   state: SessionState,
   cfg: Config,
   percent: number | undefined,
   tokens: number | undefined,
 ): SessionState {
-  if (percent === undefined || tokens === undefined) return state
   if (state.asked.length === 0 && !state.toastedAt) return state
-  if (percent < cfg.percent && tokens < cfg.tokens) {
+  if (belowFirst(cfg, percent, tokens)) {
     const { toastedAt: _gone, ...rest } = state
     return { ...rest, asked: [] }
   }

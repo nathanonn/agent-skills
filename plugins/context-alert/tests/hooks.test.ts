@@ -924,3 +924,118 @@ test('main only: a Stop carrying an agent_id does not change the background-task
   expect(w.asks.length).toBe(1) // not busy: the dialog opens
   expect(w.suggests.length).toBe(0)
 })
+
+// ---- trigger mode ----
+
+const cfgOf = (w: World) => w.store.get('config') as { trigger: string; percent: number; tokens: number; stepPercent: number }
+
+test('trigger: default is percent, tokens alone do not fire (30% / 300k)', async ($, on) => {
+  const w = world($, on)
+  await measure($, 30, 300_000)
+  await settle(w)
+  expect(w.asks.length).toBe(0)
+  const status = await typed($, 'context-alert', 'status')
+  expect(status.text).toContain('first alert at 40%, then every +15 points (trigger: percent)')
+  expect(status.text).toContain('Next alert at: 40%')
+  expect(status.text).not.toContain('300k')
+})
+
+test('trigger: set percent switches to percent mode and says so; 30% / 300k stays quiet at 35', async ($, on) => {
+  const w = world($, on, { store: { config: { trigger: 'either' } } })
+  const r = await typed($, 'context-alert', 'set percent 35')
+  expect(cfgOf(w).trigger).toBe('percent')
+  expect(cfgOf(w).percent).toBe(35)
+  expect(r.text).toContain('Trigger is now percent only')
+  expect(r.text).toContain('set trigger either')
+  await measure($, 30, 300_000)
+  await settle(w)
+  expect(w.asks.length).toBe(0)
+  await measure($, 36, 360_000)
+  await settle(w)
+  expect(w.asks.length).toBe(1)
+})
+
+test('trigger: set tokens switches to tokens mode; percent alone does not fire', async ($, on) => {
+  const w = world($, on)
+  const r = await typed($, 'context-alert', 'set tokens 250000')
+  expect(cfgOf(w).trigger).toBe('tokens')
+  expect(r.text).toContain('Trigger is now tokens only')
+  const status = await typed($, 'context-alert', 'status')
+  expect(status.text).toContain('first alert at 250k tokens, then every +150k (trigger: tokens)')
+  expect(status.text).toContain('Next alert at: 250k tokens')
+  await measure($, 90, 100_000)
+  await settle(w)
+  expect(w.asks.length).toBe(0)
+  await measure($, 26, 250_000)
+  await settle(w)
+  expect(w.asks.length).toBe(1)
+})
+
+test('trigger: set stepPercent leaves the mode alone, set trigger either uses both', async ($, on) => {
+  const w = world($, on)
+  const r = await typed($, 'context-alert', 'set stepPercent 10')
+  expect(r.text).not.toContain('Trigger is now')
+  expect(w.store.get('config') as { trigger?: string }).toMatchObject({ stepPercent: 10 })
+  expect(cfgOf(w).trigger).toBe('percent')
+  const e = await typed($, 'context-alert', 'set trigger either')
+  expect(e.text).toContain('Trigger is now either')
+  expect(e.text).toContain('(trigger: either)')
+  expect(e.text).toContain('40% or 300k tokens')
+  await measure($, 30, 300_000)
+  await settle(w)
+  expect(w.asks.length).toBe(1)
+  expect((await typed($, 'context-alert', 'set trigger both')).text).toContain('trigger takes percent, tokens or either')
+})
+
+test('trigger: a stored config without trigger reads as percent', async ($, on) => {
+  const w = world($, on, { store: { config: { percent: 40 } } })
+  await measure($, 30, 400_000)
+  await settle(w)
+  expect(w.asks.length).toBe(0)
+})
+
+test('trigger: mid-turn pending does not go pending on tokens alone in percent mode', async ($, on) => {
+  const w = world($, on)
+  await turnStart($)
+  await measure($, 30, 400_000)
+  await turnEnd($)
+  await settle(w)
+  expect(w.asks.length).toBe(0)
+})
+
+test('trigger: mid-turn pending in either mode goes pending on tokens and asks at turn end', async ($, on) => {
+  const w = world($, on, { store: { config: { trigger: 'either' } } })
+  await turnStart($)
+  await measure($, 30, 400_000)
+  await turnEnd($)
+  await settle(w)
+  expect(w.asks.length).toBe(1)
+})
+
+test('trigger: mid-turn toast ignores tokens in percent mode, uses them in either', async ($, on) => {
+  const w = world($, on, { usage: { percent: 30, tokens: 400_000 } })
+  await $.tool.call({ tool: 'Bash', command: 'ls' })
+  await settle(w)
+  expect(w.toasts.length).toBe(0)
+  await typed($, 'context-alert', 'set trigger either')
+  await $.tool.call({ tool: 'Bash', command: 'ls' })
+  await settle(w)
+  expect(w.toasts.length).toBe(1)
+})
+
+test('trigger: in percent mode a drop below the percent threshold re-arms even while tokens stay high', async ($, on) => {
+  const w = world($, on, { store: { 'session:S1': { asked: [{ pct: 41, tokens: 410_000, at: 1 }], updatedAt: NOW } } })
+  await measure($, 30, 400_000)
+  await settle(w)
+  expect((w.store.get('session:S1') as { asked: unknown[] }).asked.length).toBe(0)
+})
+
+test('status: next alert reflects the re-arm the next measure will do after a mode switch', async ($, on) => {
+  const w = world($, on, {
+    store: { config: { trigger: 'percent', percent: 35 }, 'session:S1': { asked: [{ pct: 30, tokens: 300_000, at: 1 }], updatedAt: NOW } },
+    usage: { percent: 32, tokens: 320_000 },
+  })
+  const status = await typed($, 'context-alert', 'status')
+  expect(status.text).toContain('Next alert at: 35%')
+  expect((w.store.get('session:S1') as { asked: unknown[] }).asked.length).toBe(1)
+})

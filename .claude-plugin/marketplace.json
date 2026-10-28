@@ -194,8 +194,8 @@
       "name": "context-alert",
       "displayName": "Context Alert",
       "source": "./plugins/context-alert",
-      "description": "Opens a question dialog when the context window passes 40% or 300k tokens and offers a handoff doc, without blocking background agents.",
-      "version": "0.1.0",
+      "description": "Opens a question dialog when the context window passes a threshold (40% by default) and offers a handoff doc, without blocking background agents.",
+      "version": "0.1.1",
       "author": {
         "name": "Nathan Onn"
       },

@@ -2,7 +2,7 @@ import type { EngineInterface, Register } from 'claude-code'
 import { afterMainTurn, getConfig, newRuntime, refreshConfig, tryAlert, type Runtime } from './alert'
 import { handleCommand } from './command'
 import {
-  extractHandoffPath, extractSkillHandoffPath, extractSlashHandoffPath, formatTokens, handoffPathFromWrite,
+  belowFirst, crossed, extractHandoffPath, extractSkillHandoffPath, extractSlashHandoffPath, formatTokens, handoffPathFromWrite,
   isHandoffSkill, isMarkdownWrite, nextThreshold, rearm, resetTiers, shouldToast, skillNameOf, type SessionState,
 } from './logic'
 import { loadSession, pruneSessions, rememberHandoffPath, updateSession } from './state'
@@ -31,7 +31,7 @@ async function onMeasure($: EngineInterface, rt: Runtime, e: Measure): Promise<v
     await updateSession($, sid, (s) => rearm(s, cfg, percent, tokens)) // a drop re-arms even mid-turn
   }
   if (rt.mainTurnRunning) {
-    const over = percent !== undefined && tokens !== undefined && (percent >= cfg.percent || tokens >= cfg.tokens)
+    const over = crossed(cfg, { pct: cfg.percent, tokens: cfg.tokens }, percent, tokens)
     if (contextMoved && cfg.enabled && over) rt.pending = true
     return
   }
@@ -45,7 +45,7 @@ async function onToolCallToast($: EngineInterface, rt: Runtime): Promise<void> {
   // Cheap exit before touching the session store: nothing below the first threshold can toast.
   const { percent, tokens } = context
   if (percent === undefined || tokens === undefined) return
-  if (percent < cfg.percent && tokens < cfg.tokens) return
+  if (belowFirst(cfg, percent, tokens)) return
   const sid = await $.session.id()
   let toasted = false
   await updateSession($, sid, (s: SessionState) => {

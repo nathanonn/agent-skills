@@ -1,22 +1,37 @@
 import type { EngineInterface } from 'claude-code'
 import {
-  DEFAULTS, formatTokens, nextThreshold, parseSet, type Config, type SessionState,
+  DEFAULTS, formatTokens, nextThreshold, parseSet, rearm, triggerNote, type Config, type SessionState,
 } from './logic'
 import { CONFIG_KEY, loadConfig, loadSession, updateSession } from './state'
 
 const USAGE =
   'Usage: /context-alert [status | show] | set <key> <value> | reset | reset session\n' +
-  'Keys: enabled, notify, midTurnToast (true/false); percent, tokens, stepPercent, stepTokens (numbers); whenBusy (dialog/suggest)'
+  'Keys: enabled, notify, midTurnToast (true/false); percent, tokens, stepPercent, stepTokens (numbers); trigger (percent/tokens/either); whenBusy (dialog/suggest)'
+
+function fmtLimits(c: Config): string {
+  if (c.trigger === 'percent') return `first alert at ${c.percent}%, then every +${c.stepPercent} points (trigger: percent)`
+  if (c.trigger === 'tokens') return `first alert at ${formatTokens(c.tokens)} tokens, then every +${formatTokens(c.stepTokens)} (trigger: tokens)`
+  return `first alert at ${c.percent}% or ${formatTokens(c.tokens)} tokens, then every +${c.stepPercent} points or +${formatTokens(c.stepTokens)} (trigger: either)`
+}
+
+function fmtNext(c: Config, t: { pct: number; tokens: number }): string {
+  if (c.trigger === 'percent') return `${t.pct}%`
+  if (c.trigger === 'tokens') return `${formatTokens(t.tokens)} tokens`
+  return `${t.pct}% or ${formatTokens(t.tokens)} tokens`
+}
 
 function fmtConfig(c: Config): string {
   return [
     `enabled ${c.enabled} · notify ${c.notify} · midTurnToast ${c.midTurnToast} · whenBusy ${c.whenBusy}`,
-    `first alert at ${c.percent}% or ${formatTokens(c.tokens)} tokens, then every +${c.stepPercent} points or +${formatTokens(c.stepTokens)}`,
+    fmtLimits(c),
   ].join('\n')
 }
 
-export function statusText(cfg: Config, s: SessionState, fill: string): string {
-  const t = nextThreshold(s, cfg)
+export function statusText(
+  cfg: Config, s: SessionState, fill: string, percent?: number, tokens?: number,
+): string {
+  // Show what the next measure will do: it clears tiers when the fill is already below the first threshold.
+  const t = nextThreshold(rearm(s, cfg, percent, tokens), cfg)
   const asked = s.asked.length
     ? s.asked.map((a) => `${a.pct}% / ${formatTokens(a.tokens)} at ${new Date(a.at).toISOString().slice(0, 16).replace('T', ' ')} UTC`).join('; ')
     : 'none yet'
@@ -25,18 +40,22 @@ export function statusText(cfg: Config, s: SessionState, fill: string): string {
     fmtConfig(cfg),
     `Fill now: ${fill}`,
     `Asked this session: ${asked}`,
-    `Next alert at: ${t.pct}% or ${formatTokens(t.tokens)} tokens`,
+    `Next alert at: ${fmtNext(cfg, t)}`,
     `Known handoff path: ${s.handoff ?? 'none'}`,
   ].join('\n')
 }
 
-async function fillText($: EngineInterface): Promise<string> {
+async function fillInfo($: EngineInterface): Promise<{ text: string; percent?: number; tokens?: number }> {
   try {
     const { context } = await $.session.usage()
-    if (context.percent === undefined || context.tokens === undefined) return 'unknown'
-    return `${context.percent}% (${formatTokens(context.tokens)} of ${formatTokens(context.window)})`
+    if (context.percent === undefined || context.tokens === undefined) return { text: 'unknown' }
+    return {
+      text: `${context.percent}% (${formatTokens(context.tokens)} of ${formatTokens(context.window)})`,
+      percent: context.percent,
+      tokens: context.tokens,
+    }
   } catch {
-    return 'unknown'
+    return { text: 'unknown' }
   }
 }
 
@@ -52,7 +71,8 @@ export async function handleCommand($: EngineInterface, args: string, fx: Comman
 
   if (sub === 'status' || sub === 'show') {
     const sid = await $.session.id()
-    return statusText(await loadConfig($), await loadSession($, sid), await fillText($))
+    const fill = await fillInfo($)
+    return statusText(await loadConfig($), await loadSession($, sid), fill.text, fill.percent, fill.tokens)
   }
 
   if (sub === 'set') {
@@ -60,10 +80,14 @@ export async function handleCommand($: EngineInterface, args: string, fx: Comman
     if (!key || vals.length === 0) return `set needs a key and a value.\n${USAGE}`
     const r = parseSet(key, vals.join(' '))
     if (!r.ok) return r.error
-    const cfg = { ...(await loadConfig($)), [r.key]: r.value }
+    const prev = await loadConfig($)
+    const cfg: Config = { ...prev, [r.key]: r.value }
+    if (r.key === 'percent') cfg.trigger = 'percent'
+    if (r.key === 'tokens') cfg.trigger = 'tokens'
     await $.store.set(CONFIG_KEY, cfg)
     fx.onConfig?.(cfg)
-    return `${r.key} = ${String(r.value)}\n${fmtConfig(cfg)}`
+    const note = cfg.trigger !== prev.trigger ? `\n${triggerNote(cfg.trigger)}` : ''
+    return `${r.key} = ${String(r.value)}${note}\n${fmtConfig(cfg)}`
   }
 
   if (sub === 'reset') {

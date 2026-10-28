@@ -190,9 +190,9 @@ confirming it works on your machine.
 
 **Asks whether to write a handoff doc when your context window gets heavy.**
 
-When the main session's context passes **40% of the window or 300k tokens, whichever comes first**, it opens the AskUserQuestion dialog at the end of the turn, never mid-turn. The options are "Handoff, then compact", "Handoff only", "Compact now" and "Not now". After "Not now" it asks again every +15 percentage points or +150k tokens. Any compaction resets it to the first threshold. It watches the main session only, so sub-agent turns never trigger it, and it is designed not to block background agents. `/context-alert` shows or changes the settings.
+When the main session's context passes **40% of the window** (the default), it opens the AskUserQuestion dialog at the end of the turn, never mid-turn. The options are "Handoff, then compact", "Handoff only", "Compact now" and "Not now". After "Not now" it asks again every +15 percentage points. Any compaction resets it to the first threshold. It watches the main session only, so sub-agent turns never trigger it, and it is designed not to block background agents. `/context-alert` shows or changes the settings: `set percent` or `set tokens` switches which limit counts, and `set trigger either` fires on whichever comes first.
 
-**Beta.** Version 0.1.0. The core flow is verified live; some live tests are still pending. The plugin's [README](plugins/context-alert/README.md) lists the known limits.
+**Beta.** Version 0.1.1. The core flow is verified live; some live tests are still pending. The plugin's [README](plugins/context-alert/README.md) lists the known limits.
 
 It bundles its own copy of the `handoff-doc` skill, which must stay identical to the one under `plugins/handoff-doc/`. That copy is the only part of the plugin that has a counterpart under `skills/`.
 

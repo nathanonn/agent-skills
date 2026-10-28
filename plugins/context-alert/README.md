@@ -2,9 +2,9 @@
 
 A Claude Code mod that notices when your context window is getting heavy and offers to write a handoff doc before compaction.
 
-**Version 0.1.0, beta.** The core flow is verified live. Some behaviour is not yet verified live (see Known limits).
+**Version 0.1.1, beta.** The core flow is verified live. Some behaviour is not yet verified live (see Known limits).
 
-After every main-thread turn, Claude Code reports how full the context is. When the fill reaches **40% of the window or 300,000 tokens, whichever comes first**, Context Alert opens a question dialog:
+After every main-thread turn, Claude Code reports how full the context is. When the fill reaches **40% of the window** (the default), Context Alert opens a question dialog. You can switch to a token limit, or use both (see Trigger modes below):
 
 ```
 The context window is now at 40% (80k of 200k tokens).
@@ -26,7 +26,7 @@ The dialog never opens in the middle of a turn. If the fill crosses a threshold 
 | Handoff, then compact | Runs the handoff chain below, then compacts once the handoff turn ends with a `.md` written. It waits up to 3 turns (for example while Claude asks for the path). An interrupted turn, or 3 turns with no write, cancels the compaction with a toast |
 | Handoff only | Runs the handoff chain below and leaves the context alone, for when you'd rather `/clear` and start fresh from the doc |
 | Compact now | Queues `/compact`, which runs once the session is idle. If that is refused it tries the compaction call directly, and if that fails too it shows "Compaction couldn't start; run /compact" |
-| Not now | Nothing. The next alert steps up one tier (+15 points or +150k) |
+| Not now | Nothing. The next alert steps up one tier (+15 points by default; +150k tokens in tokens mode; whichever comes first in either mode) |
 | Other... | Your text is sent to Claude as an instruction |
 
 | Esc | Same as Not now |
@@ -35,7 +35,7 @@ If a handoff was already written in this session, the two handoff options read "
 
 ## Alerts and notifications
 
-- **Tiers.** After the first alert it asks again every +15 percentage points or +150k tokens above the fill recorded at the last alert (for example, an alert at 41% is followed by one at 56%). That fill is recorded when the dialog opens, so the step-up applies after any answer until a compaction resets it. A tier counts as used only once the dialog actually opens (or the suggestion is shown); a held or refused alert is retried at the next idle point. **Any compaction** (`/compact`, auto-compact, or one of the options above) starts the tiers over at the first threshold, whatever the fill after it. A `/clear` does too, once the fill drops below the first threshold. The step-up only applies while you keep going without compacting.
+- **Tiers.** After the first alert it asks again every +15 percentage points by default (+150k tokens in tokens mode; whichever comes first in either mode) above the fill recorded at the last alert (for example, an alert at 41% is followed by one at 56%). That fill is recorded when the dialog opens, so the step-up applies after any answer until a compaction resets it. A tier counts as used only once the dialog actually opens (or the suggestion is shown); a held or refused alert is retried at the next idle point. **Any compaction** (`/compact`, auto-compact, or one of the options above) starts the tiers over at the first threshold, whatever the fill after it. A `/clear` does too, once the fill drops below the first threshold. The step-up only applies while you keep going without compacting.
 - **One dialog at a time.** While a dialog is open, a new tier does not open a second one.
 - **Notification.** On by default. When the dialog opens (or the suggestion is raised), a desktop or phone notification is sent too. Headless runs (`-p`) send none. Turn it off with `/context-alert set notify false`.
 - **Mid-turn toast.** On by default. If a long turn crosses a threshold, one toast per tier says so. The dialog still waits for the turn to end.
@@ -83,13 +83,26 @@ Anything else after `reset` prints the usage text and changes nothing.
 | Key | Default | Values |
 |---|---|---|
 | `enabled` | `true` | `true` / `false`. When false, nothing runs, including toast and notification |
-| `percent` | `40` | first alert at this percent of the window (above 0, up to 100; decimals such as 0.5 are accepted) |
-| `tokens` | `300000` | first alert at this many tokens (whole number) |
+| `trigger` | `percent` | `percent` / `tokens` / `either`. Which limit counts (see Trigger modes) |
+| `percent` | `40` | first alert at this percent of the window (above 0, up to 100; decimals such as 0.5 are accepted). Setting it switches the trigger to `percent` |
+| `tokens` | `300000` | first alert at this many tokens (whole number). Setting it switches the trigger to `tokens` |
 | `stepPercent` | `15` | later alerts every this many points (same range as `percent`) |
 | `stepTokens` | `150000` | later alerts every this many tokens (whole number) |
 | `notify` | `true` | `true` / `false` |
 | `midTurnToast` | `true` | `true` / `false` |
 | `whenBusy` | `dialog` | `dialog` / `suggest` |
+
+### Trigger modes
+
+The trigger decides which limit counts, for the first alert and for the later steps.
+
+- `percent` (default): only `percent` and `stepPercent` count. Token counts are ignored.
+- `tokens`: only `tokens` and `stepTokens` count. The percent fill is ignored.
+- `either`: whichever limit is crossed first. This is the "40% or 300k tokens" behaviour, and it is useful on 1M windows, where 40% is 400k tokens and you want a 300k cap.
+
+`/context-alert set percent 35` stores 35 and switches to `percent`. `/context-alert set tokens 250000` stores the number and switches to `tokens`. `/context-alert set trigger either` uses both limits. `set stepPercent` and `set stepTokens` never change the trigger. When a `set` changes the trigger, the reply says so.
+
+**Upgrading from 0.1.0:** a saved config without a trigger reads as `percent`, so the token limit no longer counts. Run `/context-alert set trigger either` to keep the old "whichever first" behaviour with the 300k cap.
 
 Settings are kept across sessions. A bad key or value is refused with a message.
 
