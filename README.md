@@ -16,6 +16,16 @@ Turns Claude into a thoughtful collaborator that asks the right questions before
 
 **Trigger:** `/ask-first`, "ask me questions first", "clarify before doing", prefix tasks with "ask:"
 
+### orchestrate
+
+**Run the main Claude Code session as an orchestrator that delegates to sub-agents.**
+
+Builds a task list for a multi-step request, then routes each task to a sub-agent with an explicit model and effort (Sonnet, Opus or Haiku; Fable only with your say-so). Up to 5 read-only agents run in parallel, and agents that edit files run one at a time in the main checkout. Git worktrees are used only when you ask for them. The orchestrator verifies the work, commits checkpoints locally on the current branch, and never pushes unless you ask. Say you do not want to be asked questions and it runs in no-ask mode.
+
+**Trigger:** "orchestrate this", "delegate this", "use sub-agents", "fan out", "work in parallel"
+
+> **Setup:** Claude Code specific in behavior (it relies on the Agent tool and per-agent model routing), even though it installs through `npx skills` too. Setting `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is recommended. Install only one copy: a second copy (the plugin loads as `orchestrate:orchestrate`) can trigger instead, with different rules. An optional `CLAUDE.md` section makes it load for every non-trivial request in a repo. Details are in [`references/setup.md`](plugins/orchestrate/skills/orchestrate/references/setup.md) inside the skill.
+
 ### cli-spec-to-goal
 
 **Convert a Node.js CLI tool spec into a Codex /goal-ready bundle.**
@@ -239,6 +249,7 @@ For Claude Code, you can also install the packaged plugin versions:
 
 # Install individual plugins
 /plugin install ask-first@nathanonn-agent-skills
+/plugin install orchestrate@nathanonn-agent-skills
 /plugin install cli-spec-to-goal@nathanonn-agent-skills
 /plugin install webg-spec-to-goal@nathanonn-agent-skills
 /plugin install wp-spec-to-goal@nathanonn-agent-skills
@@ -292,6 +303,9 @@ also available as slash commands:
 ```bash
 # Ask-first: prefix any task with the skill
 /ask-first Build a REST API for user authentication
+
+# Orchestrate: ask for sub-agents on a multi-step task
+/orchestrate Build the feature described in docs/spec.md with sub-agents
 
 # Spec-to-goal skills: describe what you want to build
 /cli-spec-to-goal A CLI tool that converts CSV files to JSON with filtering

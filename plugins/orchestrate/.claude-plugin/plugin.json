@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "orchestrate",
+  "displayName": "Orchestrate",
+  "version": "1.0.0",
+  "description": "Run the main Claude Code session as an orchestrator: a task list, sub-agents routed by model and effort, and verified checkpoint commits.",
+  "author": {
+    "name": "Nathan Onn",
+    "url": "https://github.com/nathanonn"
+  },
+  "repository": "https://github.com/nathanonn/agent-skills",
+  "license": "MIT",
+  "keywords": ["orchestration", "sub-agents", "delegation", "model-routing", "worktrees", "workflow"]
+}
