@@ -8,6 +8,11 @@
       "skills": ["ask-first"]
     },
     {
+      "title": "Orchestration",
+      "description": "Skills that turn the main session into an orchestrator for sub-agents.",
+      "skills": ["orchestrate"]
+    },
+    {
       "title": "Codex /goal",
       "description": "Skills that produce Codex /goal-ready implementation bundles.",
       "skills": ["cli-spec-to-goal", "webg-spec-to-goal"]

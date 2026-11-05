@@ -202,6 +202,19 @@
       "license": "MIT",
       "keywords": ["context", "handoff", "alert", "mod", "hooks"],
       "category": "workflow"
+    },
+    {
+      "name": "orchestrate",
+      "displayName": "Orchestrate",
+      "source": "./plugins/orchestrate",
+      "description": "Run the main Claude Code session as an orchestrator: a task list, sub-agents routed by model and effort, and verified checkpoint commits.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Onn"
+      },
+      "license": "MIT",
+      "keywords": ["orchestration", "sub-agents", "delegation", "model-routing", "worktrees", "workflow"],
+      "category": "workflow"
     }
   ]
 }
