@@ -125,7 +125,7 @@ all three but are not defaults anywhere.
 | `haiku` | `medium` | `high` once, then escalate to `sonnet` | longer agent task, strict instruction following | `xhigh`/`max` (compare with Sonnet first) |
 | `haiku` | `low` | n/a | quick, mechanical, single-lookup work only | `low` on searches that must not miss, or long briefs: it skips searches and checks |
 | `sonnet` | `medium` | `high` | tricky debugging, subtle concurrency or state bugs, longer tasks | `xhigh`/`max`; `low` for code changes (skips verification) |
-| `opus` | `medium` | `high` | reviews, architecture, ambiguous or edge-case-heavy work | `xhigh` unless `high` missed; `max` almost never (overthinks, long turns) |
+| `opus` | `medium` | `high` | reviews, architecture, ambiguous or edge-case-heavy work | `xhigh` unless `high` skipped work (§6); `max` almost never (overthinks, long turns) |
 
 Opus at `medium` is enough for most work, so `opus` does not need `high` by
 default. Thinking is never fully off on `opus`; on `haiku` and `sonnet`, `low`
@@ -156,6 +156,7 @@ Mechanics:
 | Sprawling change; escalation from sonnet (see §6 for the effort) | `general-purpose` | `opus` · `medium` | none (one writer at a time); worktree only in worktree mode |
 | Architecture, hard debugging, edge-case-heavy change | `general-purpose` | `opus` · `high` | none (one writer at a time); worktree only in worktree mode |
 | Review of an integrated diff | `general-purpose` | `opus` · `high` | none (read-only brief) |
+| Drive a flow and collect evidence (verifier brief) | `general-purpose` | `sonnet` · `medium` | none; one at a time when it changes app state (writer rule) |
 
 Notes:
 
@@ -176,25 +177,57 @@ Notes:
 ## 6. Escalation ladder
 
 For a task whose output misses its done-criteria, pick the step that fits the
-failure. At most 2 delegated retries per task, then do it in-session.
+failure. At most 2 delegated retries per task, then do it in-session (the one
+exception is an approved Fable run, below).
 
-- **Partial** (hit `maxTurns`, ran out of budget, stopped mid-way): resume the
-  same agent with `SendMessage` and say what is left. It keeps its history, its
-  model and its effort. Not for Haiku budget overruns (below).
+- **Partial** (hit `maxTurns` or its budget, was cut off, or ended on its own
+  and reported done with listable work missing): resume the same agent with
+  `SendMessage` and say what is left. It keeps its history, its model and its
+  effort, and this counts as a retry. If it misses again, raise effort (below).
+  Not for Haiku budget overruns (below).
+- **Review found a `confirmed` defect**: send the findings with SendMessage to
+  the task's original agent when it ran unisolated, is still resumable and its
+  context is small (under ~100k tokens).
+  Otherwise brief one fresh writer, unisolated, with the findings and the
+  author's report. A defect that spans several tasks' files always goes to one
+  fresh writer. You make one-line fixes yourself. Each fix round counts as one
+  of that task's 2 delegated retries.
+- **Could not reproduce** (a bug-fix worker stopped as its brief says): not a
+  model miss. Re-brief with a reproducer or more context, or allow the fix
+  unreproduced and say so in the report.
 - **Wrong or off-scope** (the brief was the problem): re-brief a fresh agent with
   what you learned (tighter scope, the missing context, the failing check).
-- **The model fell short** (the brief was fine): first raise effort one step if
-  §4 allows it, otherwise escalate one model tier, same brief. Effort steps:
-  haiku `low` → `medium`, haiku `medium` → `high` (once); sonnet `medium` →
-  `high`; opus `medium` → `high` → `xhigh` (only after `high` missed). Tier
-  steps: haiku → `sonnet·medium`; sonnet → `opus·medium`, or `opus·high` when the
-  task is in the `high` category (§5) or already failed at `sonnet·high`. Never
-  drop effort on escalation.
+- **The model fell short** (the brief was fine): raise effort one step if §4
+  allows it, or escalate one model tier, same brief (adding the failing check or
+  its output is not a re-brief). Either is a fresh Agent call: tell it what the
+  last attempt left in the tree, or roll that back first. The worker's report
+  hints at which to try first; it is a hint, not a rule:
+  - **Skipped work** (did not read a file it needed, did not run the verify
+    command, missed an edge case): raise effort one step. Listable work
+    missing goes to Partial first.
+  - **Tried with full context and still wrong** (wrong approach, misread the
+    spec or data): at the model's default effort, one effort step is still
+    allowed; above the default, go up a tier. If the misreading traces to the
+    brief, re-brief first (wrong or off-scope, above).
+  - **Opus tried with full context and still wrong**: a counting miss (the only
+    kind that counts toward "Opus missed twice"). At `medium`, the effort step
+    above applies. At `high` there is no next tier and no `xhigh`: after the
+    first counting miss, brief a fresh agent with what the failed attempt
+    showed (e.g. the wrong layer), or do it in-session; after the second, ask
+    the Fable question (below).
+
+  Effort steps: haiku `low` → `medium`, haiku `medium` → `high` (once); sonnet
+  `medium` → `high`; opus `medium` → `high` → `xhigh` (only after `high`
+  skipped work). Tier steps: haiku → `sonnet·medium`; sonnet → `opus·medium`, or
+  `opus·high` when the task is in the `high` category (§5) or already failed at
+  `sonnet·high`. Never drop effort on escalation.
 - **Opus missed twice on the same task** (after the effort steps above): stop and
   ask the user with AskUserQuestion whether to run it on `fable`, with the
   reason. Do not run `fable` unless the user approves. If they decline, or in
   no-ask mode (never Fable there, even if the request names it), do it
-  in-session or report what is stuck.
+  in-session or report what is stuck. A miss classed as skipped work never
+  counts; only Opus misses with full context do. Ask even when the 2 retries are
+  used up: an approved Fable run is the one attempt allowed past the cap.
 - **Haiku overran its budget, flailed, or hit errors or rate limits**: escalate
   to `sonnet` (or do it yourself if it is small). Never retry it on Haiku.
 - **Retries used up, or the task turned out to be tiny**: do it in-session.

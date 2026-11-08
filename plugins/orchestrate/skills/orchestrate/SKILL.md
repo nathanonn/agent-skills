@@ -19,8 +19,8 @@ Read these when the step calls for them:
 - [references/worktree-protocol.md](references/worktree-protocol.md): preflight
   outcomes (every run), then worktree mode only: dispatch rules, integration,
   conflicts, cleanup.
-- [references/brief-template.md](references/brief-template.md): the brief every
-  sub-agent gets, plus Haiku, Explore and review add-ons.
+- [references/brief-template.md](references/brief-template.md): the worker brief,
+  plus Haiku, Explore, reviewer and verifier briefs.
 - [references/setup.md](references/setup.md): install, recommended settings,
   `.gitignore` lines, the optional CLAUDE.md sections, checks after installing.
 
@@ -174,10 +174,8 @@ bash "${CLAUDE_SKILL_DIR}/scripts/preflight.sh" --worktrees  # worktree mode
    log it).
 2. **Create the task list with TaskCreate**, one task per self-contained unit with
    a clear deliverable. The subject starts with the model label:
-   `[sonnet·medium] Add REST endpoint for presets`,
-   `[haiku·low] List every caller of loadConfig`,
-   `[haiku·medium] Shortlist open issues that mention slow loads`,
-   `[opus·high] Review integrated diff against spec`.
+   `[sonnet·medium] Add REST endpoint for presets`, `[haiku·low] List callers`,
+   `[haiku·medium] Shortlist slow-load issues`, `[opus·high] Review diff vs spec`.
    The description carries: objective, files owned, inputs, done-criteria.
 3. **Wire dependencies** with TaskUpdate `addBlockedBy`.
 4. If the Task tools are missing, say that `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is not
@@ -238,13 +236,15 @@ BASE) are in [references/worktree-protocol.md](references/worktree-protocol.md) 
 
 ### 5. Brief
 
-Every agent gets the full template from
-[references/brief-template.md](references/brief-template.md): objective, context
-with the settled decisions, files owned and off-limits, tools and sources, the
-restated rules, output format and size cap, done-criteria with the verify command,
-and "End with the list of files changed and how you verified them." Worktree briefs
-(worktree mode only) add BASE and the main checkout path, and Haiku briefs add the
-budget guardrails. Never send a one-liner: the worker has none of your context.
+Every agent gets a full brief from
+[references/brief-template.md](references/brief-template.md): builders and
+investigators the worker brief, reviewers the reviewer brief, verifiers the
+verifier brief; you are the only checker (hard rule 9). The worker brief carries
+objective, context with the settled decisions, files owned and off-limits, tools
+and sources, the restated rules, output format and size cap, done-criteria with
+the verify command, and "End with the list of files changed and how you verified
+them." Worktree briefs (worktree mode only) add BASE and the main checkout path,
+and Haiku briefs add the budget guardrails. Never send a one-liner.
 
 ### 6. Monitor
 
@@ -262,13 +262,18 @@ budget guardrails. Never send a one-liner: the worker has none of your context.
   (a writer, or an integrated worktree patch), normal mode: ask the user with
   AskUserQuestion whether to commit that path with their edits in it or leave
   it out; no-ask mode: leave it out of every commit and log it.
-- **Misses**: pick the step that fits the failure. Partial → resume the same agent
-  with SendMessage; wrong or off-scope → re-brief a fresh agent with what you
-  learned; the model fell short → raise effort one step where the model guide
-  §6 allows it, else escalate one tier (haiku → sonnet → opus); Opus missing
-  twice is where Fable may be offered (hard rule 1). A Haiku budget
-  overrun or error loop escalates straight to sonnet. At most 2 delegated retries
-  per task, then do it in-session. Record each attempt in the task metadata.
+- **Could not run** (verify command or flow; uses no retry): one in-session
+  repair attempt, limited to the repo's documented local start command (e.g.
+  `npm run dev`, as the README documents it); never install or touch anything
+  outside the repo. Still failing → `unverified (could not run)`, report why.
+  Never send the worker to fix the environment or swap in an unstated weaker check.
+- **Misses**: pick the step that fits the failure (model guide §6). Partial, incl.
+  done with listable work missing → resume with SendMessage; wrong or off-scope →
+  re-brief a fresh agent with what you learned; the model fell short → effort or
+  tier, using the hint in §6; two full-context Opus misses (skipped work never
+  counts) → Fable may be offered, even past the cap (hard rule 1); a review defect
+  → §6. A Haiku overrun or error loop goes straight to sonnet. At most 2 delegated
+  retries per task, then in-session. Record each attempt in the task metadata.
 - Haiku output always gets a spot-check: open a few of the paths it cites. A Haiku
   shortlist is verified by sonnet or opus (triage-then-verify, model guide §3).
 
@@ -310,8 +315,16 @@ mismatched pair and refuses a locked worktree (its agent may still be running).
 
 When all results are in, run the full verification once on the combined result
 in the main checkout (after worktree cleanup, in worktree mode). For a large or
-risky diff, add one fresh-context review (`opus·high`, review variant of the
-brief). Skip it when a test run already proves the change.
+risky diff, add one fresh-context review (`opus·high`, reviewer brief). Skip it
+when a test run already proves the change. At most 2 review rounds per run,
+round 2 only when a test run does not prove the round-1 fixes; after round-2
+fixes re-run verification, never a third review. Stop early when a review has no
+`confirmed` blocker or should-fix.
+
+Fix `confirmed` blockers and should-fixes (who: model guide §6); carry the
+`plausible` items and nits. A `plausible` blocker that changes a contract other
+code depends on or touches auth, access control, money, stored data, concurrency
+or secrets gets one try (you or the resumed reviewer) at a breaking input; success → `confirmed`.
 
 ### 8. Commit
 
@@ -355,11 +368,12 @@ End the run with:
 | #1 `[haiku·low] …` | haiku·low | done | spot-checked 3 paths |
 | #2 `[sonnet·medium] …` | sonnet·medium → sonnet·high → opus·high (escalated) | done | `npm test` green |
 
-Then: what failed or stays unverified (say so plainly, never bury it), the
-commits made (short SHA and subject, on which branch), a **Left uncommitted**
-list (pre-existing paths left out, with any task changes mixed into them, and
-anything else not committed), and, only if worktrees were used, confirmation that
-`git worktree list` shows only the main checkout.
+Then: what failed or stays unverified (say so plainly, never bury it; list each
+carried review item once under "unverified"), the commits made (short SHA and
+subject, on which branch), a **Left uncommitted** list (pre-existing paths left
+out, with any task changes mixed into them, and anything else not committed),
+and, only if worktrees were used, confirmation that `git worktree list` shows
+only the main checkout.
 
 In no-ask mode, add:
 
