@@ -181,8 +181,8 @@
       "name": "codex-imagegen",
       "displayName": "Codex Imagegen",
       "source": "./plugins/codex-imagegen",
-      "description": "Generate images via Codex's built-in $imagegen skill, land them in the project, and auto-clean the generated_images cache so storage stays flat.",
-      "version": "1.0.0",
+      "description": "Generate images with the Codex CLI's built-in $imagegen skill, save them into the project, and remove each run's generated_images cache folder so storage stays flat.",
+      "version": "1.1.0",
       "author": {
         "name": "Nathan Onn"
       },
