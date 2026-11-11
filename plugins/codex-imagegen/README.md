@@ -2,13 +2,13 @@
 
 Generate images with the Codex CLI's built-in $imagegen skill, save them into the project, and remove each run's generated_images cache folder so storage stays flat.
 
-Version 1.1.0 · Works with: Needs Codex · [SKILL.md](skills/codex-imagegen/SKILL.md)
+Version 1.1.1 · Works with: Needs Codex · [SKILL.md](skills/codex-imagegen/SKILL.md)
 
 ## What it does
 
 **Generate images with Codex's built-in `$imagegen` and keep them out of your cache.**
 
-Generates images (featured images, illustrations, thumbnails, blog visuals) through the Codex CLI and saves them into your project. With no `--dest` and no `dest` in a project config, images go to `.codex-imagegen/output/` under the nearest folder that has a `.codex-imagegen/` directory, or under the current directory when there is none. Once an image is confirmed at the destination, the run's `$CODEX_HOME/generated_images/<thread-id>/` folder is removed. `--report` and `--sweep` handle folders left over from past sessions.
+Generates images (featured images, illustrations, thumbnails, blog visuals) through the Codex CLI and saves them into your project. With no `--dest` and no `dest` in a project config, images go to `.codex-imagegen/output/` under the nearest folder that has a `.codex-imagegen/` directory, or under the current directory when there is none. Once an image is confirmed at the destination, the run's `$CODEX_HOME/generated_images/<session-id>/` folder (named after that run's Codex session id) is removed. No other folder is touched. Runs into different destinations are safe; two runs into the same destination at the same time are not, so don't do that. `--report` and `--sweep` handle folders left over from past sessions.
 
 No model ID ships with the skill. Model and reasoning effort resolve per key, highest priority first: `--model`/`--effort` flags, the `CODEX_IMAGEGEN_MODEL`/`CODEX_IMAGEGEN_EFFORT` environment variables, the nearest `<project>/.codex-imagegen/config.toml`, shallower configs up the tree, the machine profile `$CODEX_HOME/imagegen.config.toml`, then the Codex default. A project that sets only `model` keeps the effort, size and style it inherits from shallower files.
 
@@ -59,6 +59,8 @@ Create `~/.codex/imagegen.config.toml` (or `$CODEX_HOME/imagegen.config.toml` if
 model = "gpt-6-luna"
 model_reasoning_effort = "max"
 ```
+
+The file is a regular Codex profile that Codex itself layers in via `-p imagegen`, so other Codex keys in it (for example `service_tier`, or `model_verbosity` = low|medium|high) take effect too.
 
 Use double-quoted strings and keep the keys at the top of the file. The profile also accepts single quotes, but project config files accept only double quotes, so double quotes work everywhere. The script stops reading the profile at the first `[table]` header and skips unquoted values.
 

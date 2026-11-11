@@ -109,8 +109,13 @@ that size or style in the prompt because the script appends it automatically.
 ### 2. Run the script
 
 ```bash
-bash <skill-dir>/scripts/codex-imagegen.sh --dest "<destination-dir>" "<prompt text>"
+bash <skill-dir>/scripts/codex-imagegen.sh "<prompt text>"
 ```
+
+Pass `--dest DIR` only when the user names a folder. Otherwise omit it and let
+the script resolve the destination (config `dest`, then the marker's
+`.codex-imagegen/output/`, then the current directory's). Passing `--dest`
+unasked overrides a project's `dest` and skips the containment check.
 
 Flags may appear in any order before the prompt:
 
@@ -137,7 +142,7 @@ Every generation invocation begins with a resolution trace:
 - `CONFIG_FILES=` in shallowest-to-deepest merge order, or `none`
 - `MODEL=`, `MODEL_SOURCE=`, `EFFORT=`, and `EFFORT_SOURCE=`
 - `DEST=` and `DEST_SOURCE=`
-- `SIZE=` when set and `STYLE=set` when set
+- `SIZE=` and `SIZE_SOURCE=` when set, `STYLE=set` and `STYLE_SOURCE=` when set
 
 Sources identify `flag`, `env`, `config:<absolute-path>`,
 `profile:<absolute-path>`, or `codex-default`. Destination sources identify
@@ -146,9 +151,14 @@ Sources identify `flag`, `env`, `config:<absolute-path>`,
 After a real run, the script retains the established output keys:
 
 - `GENERATED_FILES:` followed by new destination files. If Codex leaves images
-  in `$CODEX_HOME/generated_images/<thread>/`, the script moves them safely.
-- `CLEANUP=` reports whether this run's thread folder was removed. Cleanup only
-  occurs after a destination file is confirmed.
+  in its cache folder, the script moves them only when nothing new reached the destination. That folder is the one
+  named after this run's Codex session id: `$CODEX_HOME/generated_images/<session-id>/`.
+- `SESSION_ID=` is that id, or `unknown` when the script could not read it.
+- `CLEANUP=` reports whether this run's own session folder was removed. Cleanup
+  only occurs after a destination file is confirmed, and never touches any other
+  folder under `generated_images/`. When the id cannot be read, nothing there is
+  touched. Caution: runs into different destinations are safe, but two runs into
+  the same destination at the same time are not, so do not do that.
 - `LEFTOVER_THREAD_FOLDERS=` and `LEFTOVER_TOTAL_SIZE=` report older folders.
 
 Show the result to the user. In Claude Code, view the generated file with the
@@ -177,7 +187,7 @@ may contain originals from other sessions.
 - `5` means the model is unknown or its reasoning effort is unsupported.
 
 For an authentication error such as a revoked refresh token, ask the user to
-run `! codex logout && codex login` interactively. If no image and no new thread
-folder appear, inspect the Codex error; the turn may have failed before image
+run `! codex logout && codex login` interactively. If no image and no cache folder
+for the run's session appear, inspect the Codex error; the turn may have failed before image
 generation or the prompt may have been refused. Rephrase and retry once when
 appropriate.
