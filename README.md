@@ -1,390 +1,109 @@
 # Agent Skills
 
-Curated collection of agent skills for autonomous development workflows. Install them into **Claude Code**, **Codex**, **Cursor**, **GitHub Copilot**, and other agents — via the Claude Code plugin marketplace or the open Agent Skills CLI.
+14 skills and 2 Claude Code plugins for autonomous development workflows: planning, orchestration, Codex `/goal` bundles, WordPress, design systems and handoffs. The skills install into Claude Code, Codex, Cursor, GitHub Copilot and other agents; the plugins need Claude Code.
 
 By [Nathan Onn](https://www.nathanonn.com)
 
----
+[Skills](#skills) · [Install](#install) · [Requirements](#requirements)
 
 ## Skills
 
-### ask-first
-
-**Ask clarifying questions before executing tasks.**
-
-Turns Claude into a thoughtful collaborator that asks the right questions before jumping into work. Uses structured Q&A batches (2-4 questions per round with recommendations) to reach 95% confidence, then executes. Prevents assumptions, surfaces ambiguities, and respects your time by only asking what actually matters.
-
-**Trigger:** `/ask-first`, "ask me questions first", "clarify before doing", prefix tasks with "ask:"
-
-### orchestrate
-
-**Run the main Claude Code session as an orchestrator that delegates to sub-agents.**
-
-Builds a task list for a multi-step request, then routes each task to a sub-agent with an explicit model and effort (Sonnet, Opus or Haiku; Fable only with your say-so). Up to 5 read-only agents run in parallel, and agents that edit files run one at a time in the main checkout. Git worktrees are used only when you ask for them. The orchestrator verifies the work, commits checkpoints locally on the current branch, and never pushes unless you ask. Say you do not want to be asked questions and it runs in no-ask mode.
-
-**Trigger:** "orchestrate this", "delegate this", "use sub-agents", "fan out", "work in parallel"
-
-> **Setup:** Claude Code specific in behavior (it relies on the Agent tool and per-agent model routing), even though it installs through `npx skills` too. Setting `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is recommended. Install only one copy: a second copy (the plugin loads as `orchestrate:orchestrate`) can trigger instead, with different rules. An optional `CLAUDE.md` section makes it load for every non-trivial request in a repo. Details are in [`references/setup.md`](plugins/orchestrate/skills/orchestrate/references/setup.md) inside the skill.
-
-> **Credit:** The reviewer/verifier role split and the severity and confidence grading of review findings were adapted, in our own wording, from Ray Amjad's [task-lifecycle skill](https://github.com/ray-amjad/skills/tree/main/skills/task-lifecycle) (MIT).
-
-### cli-spec-to-goal
-
-**Convert a Node.js CLI tool spec into a Codex /goal-ready bundle.**
-
-Turn a rough CLI tool idea (even a vague one) into the three files Codex `/goal` needs to drive autonomous implementation: GOAL.md, VERIFY.md, and PROGRESS.md. Bakes in six AI-agent-friendly patterns (--json, stdout/stderr separation, exit codes, structured errors, TTY detection, --dry-run) into every goal. Optionally scaffolds a complete CLI project (bin/, src/, package.json, AGENTS.md, CLAUDE.md).
-
-**Supports:** JavaScript (default) and TypeScript, commander.js, Vitest, conditional SQLite and cosmiconfig.
-
-> **Prerequisite:** This skill generates goal bundles for the [Codex /goal](https://docs.openai.com/codex) autonomous coding workflow. The generated GOAL.md, VERIFY.md, and PROGRESS.md files are designed to be consumed by an AI agent running Codex `/goal` commands to implement the CLI tool autonomously.
-
-### webg-spec-to-goal
-
-**Convert a web game idea into a complete Codex /goal-ready Phaser 3 project.**
-
-Turn a rough game idea (like "build a Raiden-type game" or "make a card game") into a runnable Phaser 3 scaffold plus every goal folder needed for autonomous implementation. Auto-detects genre (shoot-em-up, card game, platformer, tower defense, puzzle), decomposes into 5-7 goals following a universal build order, and bakes in state bridge verification (window.**GAME_STATE** + Playwright).
-
-**Supports:** shoot-em-up, card-game, platformer, tower-defense, puzzle genres and their variants. Also supports extending existing games with new features.
-
-> **Prerequisite:** This skill generates goal bundles for the [Codex /goal](https://docs.openai.com/codex) autonomous coding workflow. The generated scaffold and goal folders are designed to be consumed by an AI agent running sequential Codex `/goal` commands to build the game autonomously.
-
-### wp-spec-to-goal
-
-**Convert a WordPress plugin idea into a Codex /goal-ready bundle.**
-
-Turn a rough WordPress plugin or feature idea into the three files Codex `/goal` needs: GOAL.md, VERIFY.md, and PROGRESS.md with wp-env + Playwright + wp-eval verification baked in. Optionally scaffolds a missing plugin folder, .wp-env.json, package.json, and AGENTS.md.
-
-**Supports:** New plugins and features for existing plugins, wp-env development environment, Playwright browser testing, wp-eval PHP verification.
-
-> **Prerequisite:** This skill generates goal bundles for the [Codex /goal](https://docs.openai.com/codex) autonomous coding workflow. The generated goal trio is designed to be consumed by an AI agent running Codex `/goal` commands to implement the WordPress plugin autonomously.
->
-> **Also requires [playwright-cli](https://raw.githubusercontent.com/microsoft/playwright-cli/refs/heads/main/README.md):** the generated `VERIFY.md` performs browser-visible verification through playwright-cli. Install it once with `npm install -g @playwright/cli@latest` then `playwright-cli install --skills` (needs Node.js 18+).
-
-### wp-requirements-to-goals
-
-**Convert a full WordPress plugin requirements.md into a complete Codex /goal-ready project.**
-
-The full-workflow counterpart to `wp-spec-to-goal`: where that skill handles a single vague spec, this one takes a complete `requirements.md` (multiple user stories, edge cases, settings catalog, cross-cutting features) and decomposes it into an entire multi-goal project — a `goals-plan.md`, a root scaffold (.wp-env.json, package.json, AGENTS.md, plugin bootstrap, run-goals.sh, protocols), and a layered `goals/` tree (foundation → per-user-story → non-US features → integration). Probes the repo to skip clarifications the filesystem already answers, asks the rest in ≤3 rounds, and supports phased or one-shot runs plus a resume and an extend mode.
-
-**Supports:** Multi-goal full requirements, phased (checkpoint after plan) or one-shot mode, resume from an existing goals-plan.md, extend mode for completed projects, wp-env + Playwright + wp-eval verification.
-
-> **Prerequisite:** This skill generates goal bundles for the [Codex /goal](https://docs.openai.com/codex) autonomous coding workflow. The generated project and goal folders are designed to be consumed by an AI agent running sequential Codex `/goal` commands to implement the WordPress plugin autonomously.
->
-> **Also requires [playwright-cli](https://raw.githubusercontent.com/microsoft/playwright-cli/refs/heads/main/README.md):** every goal's `VERIFY.md` performs browser-visible verification through playwright-cli. Install it once with `npm install -g @playwright/cli@latest` then `playwright-cli install --skills` (needs Node.js 18+). Phase 2 also bundles a host-installed playwright-cli skill into the generated project's `.codex/skills/`.
-
-### codex-imagegen
-
-**Generate images with Codex's built-in `$imagegen` and keep them out of your cache.**
-
-Generate images (featured images, illustrations, thumbnails, blog visuals) through Codex's `$imagegen` skill and land them straight into your project — defaulting to a `.codex-image/` folder if you don't name a destination. A single bundled script handles everything: it survives codex plugin version bumps (globs for the companion, newest wins), falls back to the `codex exec` CLI when the plugin is absent, and auto-removes each run's `~/.codex/generated_images/<thread-id>/` folder after the image is safely placed so storage stays flat. Includes `--report` and `--sweep` for clearing leftover folders from past sessions.
-
-**Supports:** codex plugin runtime or Codex CLI fallback, custom or default destinations, multiple variants, leftover-cache reporting and sweeping.
-
-> **Prerequisite:** Requires either the **codex plugin** in Claude Code (`/plugin marketplace add openai/codex-plugin-cc` then `/plugin install codex@openai-codex`; [full guide](https://github.com/openai/codex-plugin-cc#install)) **or** the **Codex CLI** (`npm i -g @openai/codex` then `codex login`). Auth is OpenAI/ChatGPT-account backed.
-
-### handoff-doc
-
-**Write a session handoff doc so the next session can pick up cold.**
-
-Distills the current session into one tight handoff doc — what was done, where things live, what's verified, and what's still open — so a future session (Claude or human) can resume without re-reading the whole transcript. You give the destination path; the skill supplies the content. It matches the destination folder's existing filename convention, asks before overwriting an existing handoff (overwrite / append / sequel), flags filename-date typos, and stays honest about what was *not* verified.
-
-**Trigger:** "write a handoff", "create a handoff doc", "update the handoff", "hand this off", or point at a path and say to capture where things stand.
-
-### extract-design-md
-
-**Extract a website's design system into a DESIGN.md file.**
-
-Point it at a live URL and it compiles a [DESIGN.md](https://github.com/google-labs-code/design.md) — YAML design tokens (colors, typography, `rounded`/`spacing` scales, components) plus prose in canonical section order — good enough to hand a coding agent so it builds new UI matching the source site. Instead of eyeballing a screenshot, it samples 3–5 real pages with playwright-cli and reads each one's CSS custom properties + computed styles (precise and cheap), takes light screenshots for the prose only, detects light/dark themes, and validates every file with the official `@google/design.md` linter as a quality gate.
-
-**Supports:** single- or dual-theme sites (emits `DESIGN.light.md` + `DESIGN.dark.md` when both exist), Tailwind and non-Tailwind token systems, auto page-selection with override, and graceful fallbacks (no design system, Firecrawl down, lint skipped).
-
-**Trigger:** `/extract-design-md <url>`, "extract the design system from &lt;url&gt;", "make a DESIGN.md from &lt;site&gt;", "get the design tokens off &lt;site&gt;", "I want my UI to look like &lt;site&gt;".
-
-> **Prerequisites:** [playwright-cli](https://github.com/microsoft/playwright-cli) on `PATH` (`npm install -g @playwright/cli@latest` then `playwright-cli install --skills`, needs Node.js 18+), a reachable [Firecrawl](https://github.com/mendableai/firecrawl) instance for page discovery (falls back to playwright link discovery if absent), and `npx` for the on-demand `@google/design.md` linter (skipped gracefully if unavailable).
-
-### extract-design-system
-
-**Extract a website's full design system — tokens *and* a component catalog — as a bundle for building native-looking pages.**
-
-The superset of `extract-design-md`. Where that skill hands you a token-only `DESIGN.md`, this one captures the whole system a coding agent needs to generate pages that reuse the source's *actual* components: a `DESIGN.md`, a component catalog (per-component anatomy, variants, and hover/focus states), reference snippets, section patterns, DTCG design tokens, and an emitted eval harness. It samples real pages with playwright-cli, reads CSS custom properties + computed styles, and packages everything under `.design_systems/<domain>-YYYYMMDD/`. This fixes the "same skin, different skeletons" failure of token-only extraction — new pages come out with the same buttons, cards, and sections as the source, not just the same colors and fonts.
-
-**You don't run `extract-design-md` first.** This skill is self-contained — it extracts the tokens and produces the `DESIGN.md` itself, then continues into the catalog. Just point it at a URL. (The optional `--components-only` flag can reuse a prior same-domain bundle's tokens + `DESIGN.md` to skip re-extraction, but that's an optimization, not a required step.)
-
-**Supports:** full-bundle output (DESIGN.md + component catalog + reference snippets + section patterns + DTCG tokens + eval harness), single- or dual-theme sites, Tailwind and non-Tailwind token systems, auto page-selection with override, and graceful fallbacks.
-
-**Trigger:** `/extract-design-system <url>`, "clone the design system", "extract components from &lt;url&gt;", "make new pages that look like &lt;site&gt;", "same buttons/cards/sections as &lt;site&gt;".
-
-> **Prerequisites:** [playwright-cli](https://github.com/microsoft/playwright-cli) on `PATH` (`npm install -g @playwright/cli@latest` then `playwright-cli install --skills`, needs Node.js 18+), a reachable [Firecrawl](https://github.com/mendableai/firecrawl) instance for page discovery (falls back to playwright link discovery if absent), and `npx` for the on-demand `@google/design.md` linter (skipped gracefully if unavailable).
-
-### design-system-to-skill
-
-**Convert an `extract-design-system` bundle into a reusable, auto-triggering per-brand skill.**
-
-The natural sequel to `extract-design-system`. That skill captures a site's design system into a `.design_systems/<domain>-YYYYMMDD/` bundle; this one packages that bundle into a self-contained skill so any later session builds pages native to the brand just by describing the task — no more pointing the agent at an `AGENTS.md` by hand. A bundled zero-dependency Node worker does all the mechanical work (validate against the bundle contract, detect the variant, copy tokens/components/snippets, render the skill body, stage the tree) and emits a manifest; the agent authors only the generated skill's trigger description. The source bundle's prose is treated as untrusted DATA — it never enters the generated skill's instructions, only its reference files.
-
-**Supports:** full and no-screenshots bundles, an optional MUST-USE mode (make one brand the sole, always-on design system for a project via a managed `CLAUDE.md` block with a single-winner guarantee), collision handling (overwrite / dated-sibling), and a `--dry-run` validation pass.
-
-**Trigger:** "turn this design system into a skill", "make a skill from the extracted design system", "convert `.design_systems/<x>` into an agent skill", "package this bundle as a skill", "generate a &lt;brand&gt; design-system skill".
-
-> **Built for Claude Code.** The worker runs anywhere with Node.js 18+, but its output is a Claude Code skill package (`.claude/skills/<slug>/`) and the optional MUST-USE mode edits a project `CLAUDE.md`. Pairs with `extract-design-system`, which produces the input bundle.
-
-### prototype-wp
-
-**Turn a WordPress plugin spec into a runnable, offline browser simulation you can click through before writing any PHP.**
-
-Answers one question — *does this specified plugin hold together as a product?* — by building the admin screens, the front-end surfaces, and the rules connecting them as a throwaway prototype, so the spec is evaluated as a product rather than read as a document. The build runs in twelve phases and separates every prototype into three layers: a WordPress-generic **spine** (admin bar, menu, notices, list tables, metaboxes, capability gates), an optional host-plugin **overlay** (WooCommerce settings tabs, product editor, storefront), and a DOM-free **engine** holding the spec's own resolution, precedence, and validation rules. The spine and overlay ship with the skill as a copyable asset kit, so only the engine is written fresh. A labelled driver panel makes every baseline state drivable, fixtures encode the spec's worked examples verbatim, and two measured verification passes (engine before any screen exists, then interface) keep the coverage claims honest. Output is a deep-linkable prototype plus a README with a coverage table, honest-limits lists, and a porting note mapping the engine to its intended PHP home.
-
-**Supports:** full-coverage mode (every spec section represented) and focused mode for a single named surface — "build me a working WordPress admin settings screen" — plus plain WordPress admin or a WooCommerce overlay, and a spec pre-flight that reports what is missing before anything is built.
-
-**Trigger:** "prototype this WordPress plugin", "simulate this WP plugin spec", "build a clickable version of this plugin", "show me what this settings tab would look like", "do these plugin requirements hold together?".
-
-> **Prerequisites:** A static file server — one command, any runtime (`python3 -m http.server`, `npx serve`, and `php -S` all work). A browser driver that can evaluate JavaScript in the page and capture a screenshot, for the verification passes. Optionally `ffmpeg`, for the video fixture recipes only. No build step, no dependency install, no Node version requirement.
-
-> **Credit:** Derived from [Matt Pocock's `prototype` skill](https://github.com/mattpocock/skills) (`skills/engineering/prototype/`, MIT licensed), which supplies the framing and the throwaway / one-command / in-memory / no-polish / surface-the-state / capture-it rules. See [NOTICE](NOTICE) for details.
-
-### validate-block-markup
-
-**Check serialized WordPress block markup against the core block library running in Node.js — no WordPress required.**
-
-Answers two separate questions about a `<!-- wp:... -->` blob: does it parse and match the core save implementations (the thing that produces "Attempt Block Recovery" in the editor when it doesn't), and would it survive being moved to a different site. Structural validity and cross-site portability are reported as separate verdicts, so theme-dependent styles and site-specific IDs surface even when the markup is structurally fine. A bundled CLI runs the real `@wordpress/blocks` and `@wordpress/block-library` packages under jsdom and prints a JSON report per input source — errors, warnings, an explicit `notChecked` list, and the canonical serialization when parse-then-serialize changed the input. Verdicts are pinned to the core blocks shipped with WordPress 7.0.2 and always name that snapshot. Review and repair are separate modes: in review mode it never edits the markup.
-
-**Supports:** files, directories of `.html`, and stdin in one invocation; JSON-only stdout with diagnostics on stderr; exit codes for pass / findings / usage error. Scope is standalone core-block markup — site-specific, theme-specific, dynamic, plugin, and third-party block content are out of scope.
-
-**Trigger:** "validate this block markup", "is this Gutenberg markup valid", "why does this block say invalid content", "check this before I paste it into the Code Editor".
-
-> **Prerequisites:** Node.js 20.10+ with `npm` on `PATH`. No WordPress, PHP, Docker, wp-env, or browser. The first validation run downloads and installs the pinned runtime — about 350 npm packages, roughly 545 MB, around 25 seconds, and it needs npm registry access; later runs are offline and instant, and `--help` / `--version` answer without installing anything. The install lands in the skill's own directory and never touches your project's `package.json`, lockfile, or `node_modules` — but with `npx skills add` the skill sits inside your repository, so those bytes land in your tree. The skill ships a `.gitignore` that keeps them out of git, and restores it before installing if an install path dropped it.
-
-### wp-rest-api
-
-**Push generated block markup, CSS and animation JS into a live WordPress site over the core REST API — `curl` and `jq`, nothing else.**
-
-Closes the last mile that used to be a copy-paste into the block editor's Code Editor. The markup is generated elsewhere; this skill transmits the bytes unchanged and then reports honestly on what the site did with them. A three-request preflight settles whether the site answers, whether the credential belongs to an administrator, and whether the active theme is a block theme — which decides whether the CSS route exists at all. Pages go through a slug-lookup upsert, because a colliding slug does not 409: WordPress appends `-2` and answers 201, so a create-first script reads as clean success while quietly making a duplicate nobody asked for. CSS lands on the user global-styles record as a deep merge and never a replace, because a naive replace destroys the site's entire colors, typography and variations record — and the skill scans for a single `<` first, which stores fine, renders fine, and makes Site Editor → Additional CSS reject the whole sheet. PHP and JS go through the Code Snippets plugin route, created inactive and switched on only after the error field comes back null. Verification is four steps, and the skill says out loud that only the last one — a human opening the page in the block editor — proves anything, because a byte-exact read-back and a green frontend both pass while the editor shows a recovery prompt.
-
-**Supports:** pages, the user global-styles record (`styles.css`), the static-front-page setting, and PHP/JS snippets via `code-snippets/v1`. Seven reference files cover the exact endpoints, the non-negotiable safety rules, five Gutenberg traps, the snippet route end to end, GSAP and scroll animation, troubleshooting, and two optional companions. Out of scope and said plainly rather than improvised around: template editing, media upload, menus, navigation, and block patterns.
-
-**Trigger:** "publish this design to my site", "push this block markup to WordPress", "send this CSS to my site", "make this my front page", "add a GSAP animation to my WordPress site".
-
-> **Prerequisites:** `curl` and `jq` 1.6+, plus `grep` and `diff` for the verification steps. An admin **Application Password** on the target site, reached over `https` or loopback `http`. No MCP server, no CLI, no SSH, no database access. The CSS route needs a **block theme** — on a classic theme there is no global-styles record, and the skill says so and stops rather than guessing. The snippet route additionally needs the **Code Snippets** plugin installed and active, and asks before installing it or running anything.
-
----
-
-## Plugins
-
-Everything above is a **skill** — a Markdown instruction file any agent can read. This section is
-for the two entries that are not: Claude Code **hooks plugins**, which run code against the engine's
-events. Hooks have no equivalent in Codex, Cursor or GitHub Copilot, so a plugin listed here
-installs through the Claude Code marketplace only. Neither is mirrored under `skills/`, with one exception: the `handoff-doc` skill bundled inside `context-alert` (see below).
-
-### wp-credential-guard
-
-**Keeps a WordPress username and Application Password out of the model's context while still letting `curl` receive the real bytes.**
-
-You paste a credential into the conversation because the work needs it; the model reads a
-session-scoped placeholder like `[WP-PASS-9a1f]` instead. When the model writes a Bash command
-using that placeholder, the real value is substituted back in — shell-quoted for the context it
-lands in — so the shell gets the credential and the transcript does not. The mapping lives in
-module memory, dies with the session, and is never written to disk. A placeholder the vault has
-never held denies the Bash call rather than running it with literal text.
-
-**Covers:** `-u user:pass` in every quoting combination, `--user=`, URL userinfo, labelled forms
-with and without a separator, a bare six-group Application Password, and the space-stripped
-24-character form. Shell references like `$WP_APP_PASSWORD` pass through untouched.
-
-**Read the limitations before trusting it.** The on-screen rewrite is cosmetic, a plugin that is
-present but not loaded fails silently, and slash commands are refused rather than masked. The
-plugin's own [README](plugins/wp-credential-guard/README.md) front-loads all of it, and
-[VERIFICATION.md](plugins/wp-credential-guard/VERIFICATION.md) is a five-check routine for
-confirming it works on your machine.
-
-> **Requires:** Claude Code with plugin hook support. Node for the test suite (`node tests/hooks.test.mjs` — no dependencies, no build step).
-
-### context-alert
-
-**Asks whether to write a handoff doc when your context window gets heavy.**
-
-When the main session's context passes **40% of the window** (the default), it opens the AskUserQuestion dialog at the end of the turn, never mid-turn. The options are "Handoff, then compact", "Handoff only", "Compact now" and "Not now". After "Not now" it asks again every +15 percentage points. Any compaction resets it to the first threshold. It watches the main session only, so sub-agent turns never trigger it, and it is designed not to block background agents. `/context-alert` shows or changes the settings: `set percent` or `set tokens` switches which limit counts, and `set trigger either` fires on whichever comes first.
-
-**Beta.** Version 0.1.1. The core flow is verified live; some live tests are still pending. The plugin's [README](plugins/context-alert/README.md) lists the known limits.
-
-It bundles its own copy of the `handoff-doc` skill, which must stay identical to the one under `plugins/handoff-doc/`. That copy is the only part of the plugin that has a counterpart under `skills/`.
-
-> **Requires:** Claude Code with function-hooks (mod) support. Tests run with `claude plugin test plugins/context-alert`.
-
----
-
-## Installation
-
-These skills install two ways. Pick whichever matches your agent.
-
-### Agent Skills CLI — Codex, Cursor, GitHub Copilot, Claude Code, and others
-
-The open [Agent Skills CLI](https://www.skills.sh) (`npx skills`) installs into any
-supported agent. It reads the canonical [`skills/`](skills/) directory at the repo root.
-
+Pick a skill, then [install](#install) it. Each name links to its page with examples, requirements and limits.
+
+| Label | Means |
+|---|---|
+| Any agent | Plain skill; installs and runs anywhere |
+| Any agent, for Codex `/goal` | Runs anywhere; its output is a bundle for Codex `/goal` |
+| Needs Codex | Calls the Codex plugin or CLI |
+| Claude Code | Installs anywhere, but built for Claude Code |
+| Claude Code plugin | Hooks; marketplace install only |
+
+### Workflow
+| Skill | What it does | Say | Works with |
+|---|---|---|---|
+| [ask-first](plugins/ask-first/README.md) | Ask clarifying questions before executing tasks. Reaches 95% confidence through structured Q&A, then executes. | "ask me questions first", or start a task with "ask:" | Any agent |
+| [orchestrate](plugins/orchestrate/README.md) | Run the main Claude Code session as an orchestrator: a task list, sub-agents routed by model and effort, and verified checkpoint commits. | "orchestrate this", "use sub-agents" | Claude Code |
+| [handoff-doc](plugins/handoff-doc/README.md) | Write or update a session handoff doc so a future session (Claude or human) can resume work without re-reading the whole transcript. | "write a handoff to &lt;path&gt;" | Any agent |
+
+### Codex /goal
+| Skill | What it does | Say | Works with |
+|---|---|---|---|
+| [cli-spec-to-goal](plugins/cli-spec-to-goal/README.md) | Convert a Node.js CLI tool specification into a Codex /goal-ready bundle with AI-agent-friendly patterns baked in. | "turn this CLI idea into a /goal bundle" | Any agent, for Codex `/goal` |
+| [webg-spec-to-goal](plugins/webg-spec-to-goal/README.md) | Convert a web game idea into a complete Codex /goal-ready Phaser 3 project with scaffold, goals-plan, and all goal folders. | `/webg-spec-to-goal <idea>` (slash command only) | Any agent, for Codex `/goal` |
+
+### WordPress
+| Skill | What it does | Say | Works with |
+|---|---|---|---|
+| [wp-spec-to-goal](plugins/wp-spec-to-goal/README.md) | Convert a WordPress plugin or feature idea into a Codex /goal-ready bundle with wp-env + Playwright verification. | `/wp-spec-to-goal <idea>` (slash command only) | Any agent, for Codex `/goal` |
+| [wp-requirements-to-goals](plugins/wp-requirements-to-goals/README.md) | Convert a full WordPress plugin requirements.md into a complete Codex /goal-ready project: goals-plan.md, root scaffold, and a layered goals/ tree (foundation, per-US, non-US, integration). | `/wp-requirements-to-goals requirements.md` (slash command only) | Any agent, for Codex `/goal` |
+| [prototype-wp](plugins/prototype-wp/README.md) | Prototype a WordPress or WooCommerce plugin spec as a runnable offline browser simulation, to judge it as a product before writing any PHP. | "prototype this WordPress plugin", "do these plugin requirements hold together?" | Any agent |
+| [validate-block-markup](plugins/validate-block-markup/README.md) | Validate, diagnose or repair serialized WordPress block markup against the core block library in Node.js, with separate verdicts for validity and portability. | "validate this block markup", "why does this block say invalid content" | Any agent |
+| [wp-rest-api](plugins/wp-rest-api/README.md) | Push block markup, CSS and JS into a WordPress site over the core REST API with an admin Application Password. Uses curl and jq only. | "push this block markup to WordPress", "make this my front page" | Any agent |
+
+### Design
+| Skill | What it does | Say | Works with |
+|---|---|---|---|
+| [extract-design-md](plugins/extract-design-md/README.md) | Extract a website's design system into a DESIGN.md file (google-labs-code format): colors, typography, spacing, components and brand feel, checked by the official linter. | "make a DESIGN.md from &lt;site&gt;" | Any agent |
+| [extract-design-system](plugins/extract-design-system/README.md) | Extract a website's tokens and component catalog (variants, states, section patterns) into a bundle a coding agent uses to build pages native to that brand. | "clone the design system of &lt;site&gt;", "make new pages that look like &lt;site&gt;" | Any agent |
+| [design-system-to-skill](plugins/design-system-to-skill/README.md) | Convert an extract-design-system output bundle into a self-contained, auto-triggering per-brand Claude Code skill that later agents use to build pages native to that brand. | "turn this design system into a skill" | Claude Code |
+
+### Media
+| Skill | What it does | Say | Works with |
+|---|---|---|---|
+| [codex-imagegen](plugins/codex-imagegen/README.md) | Generate images via Codex's built-in $imagegen skill, land them in the project, and auto-clean the generated_images cache so storage stays flat. | "create a featured image for this post" | Needs Codex |
+
+### Claude Code plugins (hooks)
+These run code on Claude Code's events, so they install through the marketplace only.
+
+| Plugin | What it does | Say | Works with |
+|---|---|---|---|
+| [wp-credential-guard](plugins/wp-credential-guard/README.md) | Masks WordPress usernames and Application Passwords in prompts with session-scoped placeholders, and restores them into Bash commands at execution time. | (automatic) | Claude Code plugin |
+| [context-alert](plugins/context-alert/README.md) | Opens a question dialog when the context window passes a threshold (40% by default) and offers a handoff doc, without blocking background agents. | (automatic); `/context-alert` for settings | Claude Code plugin |
+
+## Install
+
+Use one route per agent. On Claude Code, using both gives you every skill twice.
+
+**Claude Code**
 ```bash
-# List the available skills
-npx skills add nathanonn/agent-skills --list
-
-# Install one skill for your auto-detected agents
-npx skills add nathanonn/agent-skills --skill ask-first
-
-# Install one skill for a specific agent
-npx skills add nathanonn/agent-skills --skill ask-first --agent codex
-npx skills add nathanonn/agent-skills --skill ask-first --agent cursor
-npx skills add nathanonn/agent-skills --skill ask-first --agent github-copilot
-npx skills add nathanonn/agent-skills --skill ask-first --agent claude-code
-
-# Install globally instead of into the current project
-npx skills add nathanonn/agent-skills --skill ask-first --agent codex --global
-
-# Install every skill into all supported detected agents
-npx skills add nathanonn/agent-skills --all
-```
-
-### Claude Code plugin marketplace
-
-For Claude Code, you can also install the packaged plugin versions:
-
-```bash
-# Add the marketplace
 /plugin marketplace add nathanonn/agent-skills
-
-# Install individual plugins
 /plugin install ask-first@nathanonn-agent-skills
-/plugin install orchestrate@nathanonn-agent-skills
-/plugin install cli-spec-to-goal@nathanonn-agent-skills
-/plugin install webg-spec-to-goal@nathanonn-agent-skills
-/plugin install wp-spec-to-goal@nathanonn-agent-skills
-/plugin install wp-requirements-to-goals@nathanonn-agent-skills
-/plugin install codex-imagegen@nathanonn-agent-skills
-/plugin install handoff-doc@nathanonn-agent-skills
-/plugin install extract-design-md@nathanonn-agent-skills
-/plugin install extract-design-system@nathanonn-agent-skills
-/plugin install design-system-to-skill@nathanonn-agent-skills
-/plugin install prototype-wp@nathanonn-agent-skills
-/plugin install validate-block-markup@nathanonn-agent-skills
-/plugin install wp-rest-api@nathanonn-agent-skills
-/plugin install wp-credential-guard@nathanonn-agent-skills
-/plugin install context-alert@nathanonn-agent-skills
 ```
 
-### Manual installation
-
+**Codex, Cursor, GitHub Copilot and other agents**
 ```bash
-# Clone the repo
-git clone https://github.com/nathanonn/agent-skills.git
-
-# Claude Code: copy a plugin into your project's .claude directory
-cp -r agent-skills/plugins/ask-first .claude/plugins/ask-first
-
-# Other agents: copy a skill folder into your agent's skills directory
-# (e.g. Codex: ~/.codex/skills/ — see your agent's docs for the path)
-cp -r agent-skills/skills/ask-first <your-agent-skills-dir>/ask-first
+npx skills add nathanonn/agent-skills --list
+npx skills add nathanonn/agent-skills --skill ask-first
 ```
 
-> **Hooks plugins need one more step.** Copying is enough for a skill, but a plugin that ships
-> `hooks/` — currently `wp-credential-guard` and `context-alert` — lands on disk without
-> registering its hooks, and nothing warns you. Either enable it in `enabledPlugins` in
-> `~/.claude/settings.json` (or `.claude/settings.json`), an object keyed `"<name>@<marketplace>": true`
-> rather than an array, and restart, or skip the copy and load it
-> directly with `claude --plugin-dir agent-skills/plugins/<name>`. Run `/hooks` afterwards to
-> confirm the events are registered (for `context-alert`, run `/context-alert` instead: function-hook
-> mods may not show in `/hooks`). See the
-> [wp-credential-guard README](plugins/wp-credential-guard/README.md#install) for the detail.
-> For `context-alert`, the marketplace install above is the supported route (choose user scope,
-> then `/reload-plugins`); do not also start a session with `--plugin-dir` pointing at it, or it
-> loads twice.
+The two hooks plugins install through the Claude Code marketplace (or load for one session with `--plugin-dir`, see [docs/install.md](docs/install.md#hooks-plugins)).
 
----
+Try it: start a task with `ask:`, for example "ask: add dark mode to the settings page".
 
-## Usage
+Per-agent flags, global installs, manual copy, hooks setup and updating: [docs/install.md](docs/install.md).
 
-Once installed, invoke a skill by describing the task. In Claude Code, skills are
-also available as slash commands:
+## Requirements
 
-```bash
-# Ask-first: prefix any task with the skill
-/ask-first Build a REST API for user authentication
+| Tool | Needed by | Install |
+|---|---|---|
+| Codex `/goal` | running the output of cli-spec-to-goal, webg-spec-to-goal, wp-spec-to-goal, wp-requirements-to-goals | [Codex](https://docs.openai.com/codex) |
+| [playwright-cli](https://github.com/microsoft/playwright-cli) | wp-spec-to-goal, wp-requirements-to-goals, extract-design-md, extract-design-system | `npm install -g @playwright/cli@latest`, then `playwright-cli install --skills` (Node 18+) |
+| Codex plugin or Codex CLI | codex-imagegen | see [its page](plugins/codex-imagegen/README.md) |
+| Node.js 20.10+ | validate-block-markup (first run downloads ~545 MB into the skill folder) | |
+| Node.js 18+ | design-system-to-skill | |
+| `curl`, `jq` 1.6+, an admin Application Password | wp-rest-api | |
+| Claude Code with hooks support | wp-credential-guard, context-alert | |
 
-# Orchestrate: ask for sub-agents on a multi-step task
-/orchestrate Build the feature described in docs/spec.md with sub-agents
+Optional tools (Firecrawl for extract-design-\*, a static server and browser driver for prototype-wp) are listed on the item pages.
 
-# Spec-to-goal skills: describe what you want to build
-/cli-spec-to-goal A CLI tool that converts CSV files to JSON with filtering
-/webg-spec-to-goal Build a bullet hell shooter with power-ups
-/wp-spec-to-goal A WordPress plugin that adds custom post type for recipes
+## Credits and licence
 
-# Requirements-to-goals: point it at a full requirements doc
-/wp-requirements-to-goals Build the plugin described in requirements.md
+- MIT, see [LICENSE](LICENSE).
+- prototype-wp is derived from [Matt Pocock's `prototype` skill](https://github.com/mattpocock/skills) (MIT).
+- orchestrate's reviewer/verifier split and finding grading are adapted from Ray Amjad's [task-lifecycle skill](https://github.com/ray-amjad/skills/tree/main/skills/task-lifecycle) (MIT).
+- validate-block-markup installs GPL-2.0-or-later `@wordpress/*` packages at run time; none are distributed here.
+- Details: [NOTICE](NOTICE).
 
-# Codex-imagegen: describe the image you want
-/codex-imagegen A minimalist line-art lighthouse, square 1024x1024, as hero.png
+## Contributing
 
-# Handoff-doc: give it a destination path to capture where things stand
-/handoff-doc Write a handoff to notes/handoff/20260623_01_auth-refactor.md
-
-# Extract-design-md: point it at a site URL for a token-only DESIGN.md
-/extract-design-md https://linear.app
-
-# Extract-design-system: point it at a site URL for the full component bundle
-/extract-design-system https://linear.app
-
-# Design-system-to-skill: point it at a bundle extract-design-system produced
-/design-system-to-skill Convert .design_systems/linear-app-20260101 into a skill
-
-# Prototype-wp: point it at a WordPress plugin spec
-/prototype-wp Prototype the plugin described in docs/spec.md
-
-# Validate-block-markup: point it at serialized block markup
-/validate-block-markup Validate the block markup in content/hero.html
-
-# Wp-rest-api: name the site, then say what to push
-/wp-rest-api Publish content/hero.html to https://example.com as the landing page
-```
-
----
-
-## Repository layout
-
-```txt
-agent-skills/
-  skills/                 # canonical Agent Skills (npx skills / Codex / Cursor / ...)
-    <name>/SKILL.md       # generated mirror — do not hand-edit
-  plugins/                # Claude Code plugin marketplace (single source of truth)
-    <name>/skills/<name>/SKILL.md
-    <name>/hooks/         # hooks plugins — Claude Code only, never mirrored
-  .claude-plugin/         # marketplace manifest
-  skills.sh.json          # skills.sh page grouping (display only)
-  sync-skills.sh          # regenerates skills/ from plugins/
-```
-
-`plugins/` is the **single source of truth**. The root `skills/` directory is a
-generated mirror that exists so the Agent Skills CLI and non-Claude agents get a
-clean `skills/<name>/SKILL.md` discovery path.
-
-A plugin that ships `hooks/` rather than `skills/` is Claude-Code-only and has nothing to mirror,
-so `sync-skills.sh` skips it by design — it globs `plugins/*/skills/*`. A hooks plugin missing
-from `skills/` is correct, not a sync failure. The one exception is `context-alert`, which bundles
-a copy of the `handoff-doc` skill; that copy mirrors to the same `skills/handoff-doc/` as the
-standalone plugin, so the two copies must stay byte-identical. `sync-skills.sh` enforces this: when two plugins ship a same-named skill whose bytes differ, both `--check` and the regenerate run fail with an error instead of letting the last copy win.
-
-### Contributing — keep the mirror in sync
-
-Edit skills under `plugins/<name>/skills/<name>/`, then regenerate the mirror:
-
-```bash
-./sync-skills.sh            # rebuild skills/ from plugins/
-./sync-skills.sh --check    # verify skills/ matches plugins/ and same-named skills are identical (CI-friendly)
-```
-
-Never hand-edit files under `skills/` — they are overwritten on every sync.
-
----
-
-## License
-
-[MIT](LICENSE)
-
-The `prototype-wp` skill is derived from third-party MIT-licensed work, and the
-`validate-block-markup` skill installs GPL-2.0-or-later `@wordpress/*` packages at run
-time (none of which are distributed here) — see [NOTICE](NOTICE).
+Maintainers: see [CONTRIBUTING.md](CONTRIBUTING.md) for the mirror rules and `sync-skills.sh`.
