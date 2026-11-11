@@ -208,7 +208,7 @@
       "displayName": "Orchestrate",
       "source": "./plugins/orchestrate",
       "description": "Run the main Claude Code session as an orchestrator: a task list, sub-agents routed by model and effort, and verified checkpoint commits.",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "author": {
         "name": "Nathan Onn"
       },

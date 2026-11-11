@@ -26,6 +26,8 @@ Builds a task list for a multi-step request, then routes each task to a sub-agen
 
 > **Setup:** Claude Code specific in behavior (it relies on the Agent tool and per-agent model routing), even though it installs through `npx skills` too. Setting `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is recommended. Install only one copy: a second copy (the plugin loads as `orchestrate:orchestrate`) can trigger instead, with different rules. An optional `CLAUDE.md` section makes it load for every non-trivial request in a repo. Details are in [`references/setup.md`](plugins/orchestrate/skills/orchestrate/references/setup.md) inside the skill.
 
+> **Credit:** The reviewer/verifier role split and the severity and confidence grading of review findings were adapted, in our own wording, from Ray Amjad's [task-lifecycle skill](https://github.com/ray-amjad/skills/tree/main/skills/task-lifecycle) (MIT).
+
 ### cli-spec-to-goal
 
 **Convert a Node.js CLI tool spec into a Codex /goal-ready bundle.**

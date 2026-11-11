@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "orchestrate",
   "displayName": "Orchestrate",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Run the main Claude Code session as an orchestrator: a task list, sub-agents routed by model and effort, and verified checkpoint commits.",
   "author": {
     "name": "Nathan Onn",
