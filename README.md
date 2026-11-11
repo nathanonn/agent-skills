@@ -14,7 +14,7 @@ Pick a skill, then [install](#install) it. Each name links to its page with exam
 |---|---|
 | Any agent | Plain skill; installs and runs anywhere |
 | Any agent, for Codex `/goal` | Runs anywhere; its output is a bundle for Codex `/goal` |
-| Needs Codex | Calls the Codex plugin or CLI |
+| Needs Codex | Calls the Codex CLI |
 | Claude Code | Installs anywhere, but built for Claude Code |
 | Claude Code plugin | Hooks; marketplace install only |
 
@@ -50,7 +50,7 @@ Pick a skill, then [install](#install) it. Each name links to its page with exam
 ### Media
 | Skill | What it does | Say | Works with |
 |---|---|---|---|
-| [codex-imagegen](plugins/codex-imagegen/README.md) | Generate images via Codex's built-in $imagegen skill, land them in the project, and auto-clean the generated_images cache so storage stays flat. | "create a featured image for this post" | Needs Codex |
+| [codex-imagegen](plugins/codex-imagegen/README.md) | Generate images with the Codex CLI's built-in $imagegen skill, save them into the project, and remove each run's generated_images cache folder so storage stays flat. | "create a featured image for this post" | Needs Codex |
 
 ### Claude Code plugins (hooks)
 These run code on Claude Code's events, so they install through the marketplace only.
@@ -88,7 +88,7 @@ Per-agent flags, global installs, manual copy, hooks setup and updating: [docs/i
 |---|---|---|
 | Codex `/goal` | running the output of cli-spec-to-goal, webg-spec-to-goal, wp-spec-to-goal, wp-requirements-to-goals | [Codex](https://docs.openai.com/codex) |
 | [playwright-cli](https://github.com/microsoft/playwright-cli) | wp-spec-to-goal, wp-requirements-to-goals, extract-design-md, extract-design-system | `npm install -g @playwright/cli@latest`, then `playwright-cli install --skills` (Node 18+) |
-| Codex plugin or Codex CLI | codex-imagegen | see [its page](plugins/codex-imagegen/README.md) |
+| Codex CLI | codex-imagegen | `npm i -g @openai/codex`, then `codex login` (see [its page](plugins/codex-imagegen/README.md)) |
 | Node.js 20.10+ | validate-block-markup (first run downloads ~545 MB into the skill folder) | |
 | Node.js 18+ | design-system-to-skill | |
 | `curl`, `jq` 1.6+, an admin Application Password | wp-rest-api | |

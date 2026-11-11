@@ -1,110 +1,183 @@
 ---
 name: codex-imagegen
-description: Generate images (featured images, illustrations, diagrams, test images, blog visuals) using Codex CLI's built-in $imagegen skill, triggered through the codex plugin or codex CLI. Use this skill whenever the user asks to generate, create, or make an image, picture, illustration, featured image, thumbnail, or visual asset — including "generate an image of...", "create a featured image for this post", "make me an illustration", "$imagegen", "use codex to generate an image", or "image for this blog post". Also use when the user wants image variants or wants AI-generated artwork saved into the project. Do NOT use for screenshots, charts rendered from data, ASCII diagrams, or editing existing images.
+description: "Generate images such as featured images, illustrations, diagrams, thumbnails, and blog visuals with the Codex CLI built-in $imagegen skill, save them into the current project, and safely clean this run's generated-images cache. Use when the user asks to generate, create, or make an image, picture, illustration, featured image, thumbnail, visual asset, image variants, AI artwork, or explicitly asks to use Codex image generation. Do not use for screenshots, charts rendered from data, ASCII diagrams, or editing existing images."
 ---
 
 # Codex Imagegen
 
-Generate images with Codex's built-in `$imagegen` skill and land them in the
-project, keeping `~/.codex/generated_images/` from silently growing (it
-accumulates ~10MB per generation and is never cleaned by Codex itself).
-
-Everything is driven by one bundled script that survives plugin version bumps
-and works on machines without the codex plugin (it falls back to `codex exec`).
+Generate images with Codex's built-in `$imagegen` skill, land them in the
+project, and keep `$CODEX_HOME/generated_images/` from silently growing. The
+bundled script uses the Codex CLI directly and applies machine, workspace,
+project, environment, and per-run configuration without shipping a fixed model.
 
 ## Prerequisites
 
-Either of these (the script auto-detects which is present):
+The **Codex CLI is required**. The Claude Code codex plugin alone is not a
+runtime for this skill.
 
-- **Codex plugin in Claude Code** — `/plugin marketplace add openai/codex-plugin-cc`, then `/plugin install codex@openai-codex` (Full guide: <https://github.com/openai/codex-plugin-cc#install>).
-- **Codex CLI** (any agent) — `npm i -g @openai/codex`, then `codex login`.
+```bash
+npm i -g @openai/codex
+codex login
+```
 
-Auth is OpenAI/ChatGPT-account backed. Without one of these the script exits with
-code 3 and prints these install steps.
+Authentication is OpenAI/ChatGPT-account backed. If the CLI is absent, the
+script exits with code 3 and prints these steps.
+
+## Project folder and destination
+
+The project marker and configuration folder is:
+
+```text
+<project>/.codex-imagegen/
+├── config.toml
+├── output/
+└── refs/
+```
+
+`config.toml` is optional, `output/` is the default image destination, and
+`refs/` is reserved for future style references. A bare `.codex-imagegen/`
+directory is still a project marker.
+
+Destination precedence is:
+
+1. `--dest DIR`.
+2. Merged `[imagegen] dest`, resolved relative to the project folder that
+   holds the `.codex-imagegen/` directory.
+3. `.codex-imagegen/output/` below the deepest marker found by walking upward.
+4. `$PWD/.codex-imagegen/output/`.
+
+The walk is anchored on the normalized `--dest` directory when supplied and on
+`$PWD` otherwise. It visits ancestors up to `$HOME`, or up to the filesystem
+root when the anchor lives outside `$HOME`. The script creates the destination
+only for a real run; `--dry-run` creates nothing. Never overwrite an existing
+project asset unless the user explicitly approved replacement.
+
+A destination that comes from a config file or a marker must stay inside its
+project folder. The script canonicalizes the path and refuses a destination
+that resolves outside, so a symlink committed to a repository cannot redirect
+writes or widen what `--add-dir` authorizes. A path you pass explicitly with
+`--dest` is treated as deliberate and is not restricted.
+
+## Layered configuration
+
+Model and reasoning effort resolve independently, highest priority first:
+
+1. `--model` and `--effort` for this run.
+2. `CODEX_IMAGEGEN_MODEL` and `CODEX_IMAGEGEN_EFFORT`.
+3. The nearest `.codex-imagegen/config.toml`.
+4. Shallower `.codex-imagegen/config.toml` files up to `$HOME`.
+5. `$CODEX_HOME/imagegen.config.toml`, applied with `-p imagegen`.
+6. The normal Codex default, with no override passed.
+
+Project files merge shallowest first and deepest last, per key. A deeper file
+that sets only `model` therefore retains a shallower effort, size, or style.
+Example project configuration:
+
+```toml
+[codex]
+model = "your-current-model-slug"
+model_reasoning_effort = "high"
+model_verbosity = "low"
+service_tier = "priority"
+
+[imagegen]
+size = "1200x630"
+style = "flat editorial illustration, warm palette, no text"
+dest = "assets/generated"
+```
+
+When the user names a model or effort for one run, pass `--model` or `--effort`.
+Do not put a real model ID in this file or in any project configuration shipped
+with the skill; model catalogs change. Put a standing machine default in the
+machine profile and let users choose project values themselves.
+
+Repository config is parsed line by line and never sourced or evaluated. It
+accepts only the documented `[codex]` model-shaping keys and `[imagegen]` keys;
+unknown sections, unknown keys, malformed TOML, and invalid values fail closed.
+Project values must use double-quoted strings. The machine profile is your own
+file, so it is parsed leniently and accepts either TOML quote style.
 
 ## Workflow
 
-### 1. Determine the destination
+### 1. Compose the prompt
 
-- If the user named a destination folder, use it.
-- Otherwise default to `.codex-image/` at the project root (the script creates it).
-- If a file the user wants to create already exists at the destination (same
-  intended name), ask the user before overwriting — never silently replace.
+Write plain prompt text without the `$imagegen` token; the script prepends the
+literal token safely. Include the subject, mood, colors, exact filename, and
+number of variants. If project config supplies `size` or `style`, do not restate
+that size or style in the prompt because the script appends it automatically.
 
-### 2. Compose the image prompt
-
-Write plain prompt text — do NOT include the `$imagegen` token; the script
-prepends it safely (a `$imagegen` typed into a double-quoted shell string gets
-expanded to an empty string and the skill silently never triggers — the script
-exists partly to make that mistake impossible).
-
-Include in the prompt text:
-
-- A clear description of the image (subject, style, mood, colors).
-- Desired dimensions or aspect ratio. The raw model output is ~1254px square;
-  Codex resizes/crops to what you ask, so always state it (e.g. "1200x630
-  landscape" for a featured image).
-- The exact output filename(s), e.g. "save it as featured-image.png".
-- Number of variants if the user wants more than one.
-
-The script appends the destination directory instruction automatically.
-
-### 3. Run the script
+### 2. Run the script
 
 ```bash
 bash <skill-dir>/scripts/codex-imagegen.sh --dest "<destination-dir>" "<prompt text>"
 ```
 
-- The script needs network access (Codex calls OpenAI). **In Claude Code**, run
-  it with `dangerouslyDisableSandbox: true` so the Bash sandbox doesn't block the
-  call. In other agents/shells, run the bash command normally.
-- Set a generous timeout (600000 ms / 10 min). A generation takes 2–5 minutes.
-- Leave model/effort alone; Codex defaults handle imagegen fine.
+Flags may appear in any order before the prompt:
 
-The script resolves the runtime itself: it globs for the codex plugin's
-`codex-companion.mjs` across all marketplaces and versions (newest wins), and
-falls back to `codex exec --sandbox workspace-write` when the plugin is absent.
-If neither exists it exits with install instructions — relay them to the user.
+```text
+codex-imagegen.sh [--dest DIR] [--model M] [--effort E] [--dry-run] "prompt text"
+codex-imagegen.sh --sweep
+codex-imagegen.sh --report
+```
 
-### 4. Read the output
+The script needs network access during a real generation. **In Claude Code**,
+run it with `dangerouslyDisableSandbox: true` so the Bash sandbox does not block
+the call. In other agents or shells, run the command normally. Use a 600000 ms
+(10 minute) timeout; generation commonly takes 2–5 minutes.
 
-The script prints:
+`--dry-run` still validates the resolved model and effort against the local
+Codex model catalog, then prints the exact argument vector and composed prompt.
+It does not create directories or files and does not invoke `codex exec`.
 
-- `RUNTIME=` — which path it used (plugin companion or codex CLI).
-- `GENERATED_FILES:` followed by the new file path(s) at the destination. If
-  Codex generated but forgot to copy to the destination, the script moves the
-  files there itself.
-- `CLEANUP=` — whether this run's `~/.codex/generated_images/<thread-id>/`
-  folder was removed. It is only deleted after a file is confirmed at the
-  destination; otherwise the originals are kept so nothing is ever lost.
-- `LEFTOVER_THREAD_FOLDERS=` / `LEFTOVER_TOTAL_SIZE=` — pre-existing thread
-  folders from past sessions (TUI runs, etc.) that the script never touches.
+### 3. Read the output
 
-Show the user what was made — **in Claude Code**, view the file(s) with the Read
-tool; other agents can open the path(s) printed under `GENERATED_FILES:`.
+Every generation invocation begins with a resolution trace:
 
-### 5. Offer a sweep when leftovers are piling up
+- `RUNTIME=codex-cli`
+- `CONFIG_FILES=` in shallowest-to-deepest merge order, or `none`
+- `MODEL=`, `MODEL_SOURCE=`, `EFFORT=`, and `EFFORT_SOURCE=`
+- `DEST=` and `DEST_SOURCE=`
+- `SIZE=` when set and `STYLE=set` when set
 
-If `LEFTOVER_THREAD_FOLDERS` is more than a handful (or the size is large),
-tell the user the count and size the script reported (e.g. "there are N old
-generation folders using X MB") and offer to clear them. Only after they confirm:
+Sources identify `flag`, `env`, `config:<absolute-path>`,
+`profile:<absolute-path>`, or `codex-default`. Destination sources identify
+`flag`, `config:<absolute-path>`, `marker`, or `cwd-default`.
+
+After a real run, the script retains the established output keys:
+
+- `GENERATED_FILES:` followed by new destination files. If Codex leaves images
+  in `$CODEX_HOME/generated_images/<thread>/`, the script moves them safely.
+- `CLEANUP=` reports whether this run's thread folder was removed. Cleanup only
+  occurs after a destination file is confirmed.
+- `LEFTOVER_THREAD_FOLDERS=` and `LEFTOVER_TOTAL_SIZE=` report older folders.
+
+Show the result to the user. In Claude Code, view the generated file with the
+Read tool; other agents can open the paths listed under `GENERATED_FILES:`.
+
+### 4. Offer a sweep when leftovers accumulate
+
+If the leftover count or size is high, report it and offer to clear it. Only
+after the user confirms:
 
 ```bash
 bash <skill-dir>/scripts/codex-imagegen.sh --sweep
 ```
 
-Never sweep unprompted: old folders may hold originals from TUI sessions the
-user hasn't copied out yet.
+`--sweep` touches only `$CODEX_HOME/generated_images/`; it never touches a
+project's `.codex-imagegen/` folder. Never sweep unprompted because old folders
+may contain originals from other sessions.
 
-## Failure modes
+## Exit codes and failure modes
 
-- **Auth error** ("refresh token was revoked" / "log out and sign in again"):
-  Codex needs an interactive re-login. Ask the user to run `! codex logout && codex login`.
-- **No image at destination and no new thread folder**: the turn likely failed
-  before generation — re-read the script output for the Codex error and report
-  it. The prompt may also have been refused (content policy); rephrase and retry once.
-- **Exit code 3**: no runtime found on this machine. Relay the script's install
-  steps — either the codex plugin (`/plugin marketplace add openai/codex-plugin-cc`
-  then `/plugin install codex@openai-codex`; Full guide:
-  <https://github.com/openai/codex-plugin-cc#install>) or the Codex CLI
-  (`npm i -g @openai/codex` then `codex login`).
+- `0` means success or a completed dry run.
+- `1` means Codex ran but no image reached the destination.
+- `2` means invalid CLI usage.
+- `3` means the Codex CLI is missing; install it and run `codex login`.
+- `4` means project configuration failed closed during parsing or validation.
+- `5` means the model is unknown or its reasoning effort is unsupported.
+
+For an authentication error such as a revoked refresh token, ask the user to
+run `! codex logout && codex login` interactively. If no image and no new thread
+folder appear, inspect the Codex error; the turn may have failed before image
+generation or the prompt may have been refused. Rephrase and retry once when
+appropriate.
