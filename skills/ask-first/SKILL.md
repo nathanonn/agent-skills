@@ -1,6 +1,6 @@
 ---
 name: ask-first
-description: Ask clarifying questions before executing tasks. Use this skill whenever the user says "ask me questions first", "clarify before doing", "ask before you start", invokes /ask, or wants Claude to gather requirements through Q&A before taking action. Also trigger when the user provides a task prefixed with "ask:" or says things like "I need help figuring out how to..." or "help me think through...". This skill ensures nothing is assumed — Claude asks until 95% confident, then executes.
+description: Ask clarifying questions before executing tasks. Use this skill whenever the user says "ask me questions first", "clarify before doing", "ask before you start", invokes /ask-first, or wants Claude to gather requirements through Q&A before taking action. Also trigger when the user provides a task prefixed with "ask:" or says things like "I need help figuring out how to..." or "help me think through...". This skill ensures nothing is assumed — Claude asks until 95% confident, then executes.
 ---
 
 # Ask First — Clarify, Then Execute
