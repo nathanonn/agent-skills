@@ -2,7 +2,7 @@ NOTICE
 ======
 
 This repository is licensed under the MIT License (see LICENSE), Copyright (c)
-2026 Nathan Onn. Two skills in it involve third-party licensed work and carry
+2026 Nathan Onn. Three skills in it involve third-party licensed work and carry
 the notices below.
 
 prototype-wp
@@ -52,6 +52,20 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+orchestrate
+-----------
+
+`plugins/orchestrate/skills/orchestrate/` (mirrored at `skills/orchestrate/`)
+adapts ideas from Ray Amjad's task-lifecycle skill — https://github.com/ray-amjad/skills,
+`skills/task-lifecycle/`.
+
+Adapted, in this repository's own wording: the reviewer/verifier role split,
+and the severity and confidence grading of review findings.
+
+No text is copied from it, so its licence text is not reproduced here. The
+upstream skill is MIT licensed, Copyright (c) 2026 Ray Amjad; see
+https://github.com/ray-amjad/skills/blob/main/LICENSE.
 
 validate-block-markup
 ---------------------

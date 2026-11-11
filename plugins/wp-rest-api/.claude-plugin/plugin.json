@@ -2,8 +2,8 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "wp-rest-api",
   "displayName": "WP REST API",
-  "version": "1.0.0",
-  "description": "Push generated block markup, CSS and JS animation into a WordPress site over the core REST API, authenticated with an admin Application Password — curl and jq only, no MCP server, no CLI, no SSH.",
+  "version": "1.0.1",
+  "description": "Push block markup, CSS and JS into a WordPress site over the core REST API with an admin Application Password. Uses curl and jq only.",
   "author": {
     "name": "Nathan Onn",
     "url": "https://github.com/nathanonn"

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-marketplace-manifest.json",
   "name": "nathanonn-agent-skills",
-  "description": "Curated collection of Claude Code skills for autonomous development workflows.",
+  "description": "Agent skills and Claude Code plugins for autonomous development workflows: planning, Codex /goal bundles, WordPress, design systems and handoffs.",
   "version": "1.0.0",
   "owner": {
     "name": "Nathan Onn",
@@ -13,7 +13,7 @@
       "displayName": "Ask First",
       "source": "./plugins/ask-first",
       "description": "Ask clarifying questions before executing tasks. Reaches 95% confidence through structured Q&A, then executes.",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "author": {
         "name": "Nathan Onn"
       },
@@ -22,69 +22,17 @@
       "category": "workflow"
     },
     {
-      "name": "cli-spec-to-goal",
-      "displayName": "CLI Spec to Goal",
-      "source": "./plugins/cli-spec-to-goal",
-      "description": "Convert a Node.js CLI tool specification into a Codex /goal-ready bundle with AI-agent-friendly patterns baked in.",
-      "version": "1.0.0",
+      "name": "orchestrate",
+      "displayName": "Orchestrate",
+      "source": "./plugins/orchestrate",
+      "description": "Run the main Claude Code session as an orchestrator: a task list, sub-agents routed by model and effort, and verified checkpoint commits.",
+      "version": "1.1.0",
       "author": {
         "name": "Nathan Onn"
       },
       "license": "MIT",
-      "keywords": ["cli", "nodejs", "codex", "goal", "specification", "scaffold"],
-      "category": "development"
-    },
-    {
-      "name": "webg-spec-to-goal",
-      "displayName": "Web Game Spec to Goal",
-      "source": "./plugins/webg-spec-to-goal",
-      "description": "Convert a web game idea into a complete Codex /goal-ready Phaser 3 project with scaffold, goals-plan, and all goal folders.",
-      "version": "1.0.0",
-      "author": {
-        "name": "Nathan Onn"
-      },
-      "license": "MIT",
-      "keywords": ["game", "phaser", "codex", "goal", "specification", "scaffold"],
-      "category": "development"
-    },
-    {
-      "name": "wp-spec-to-goal",
-      "displayName": "WordPress Spec to Goal",
-      "source": "./plugins/wp-spec-to-goal",
-      "description": "Convert a WordPress plugin or feature idea into a Codex /goal-ready bundle with wp-env + Playwright verification.",
-      "version": "1.0.0",
-      "author": {
-        "name": "Nathan Onn"
-      },
-      "license": "MIT",
-      "keywords": ["wordpress", "plugin", "codex", "goal", "specification", "scaffold"],
-      "category": "development"
-    },
-    {
-      "name": "wp-requirements-to-goals",
-      "displayName": "WordPress Requirements to Goals",
-      "source": "./plugins/wp-requirements-to-goals",
-      "description": "Convert a full WordPress plugin requirements.md into a complete Codex /goal-ready project with a layered goals/ tree (foundation, per-US, non-US, integration).",
-      "version": "1.0.0",
-      "author": {
-        "name": "Nathan Onn"
-      },
-      "license": "MIT",
-      "keywords": ["wordpress", "plugin", "codex", "goal", "requirements", "multi-goal", "scaffold"],
-      "category": "development"
-    },
-    {
-      "name": "codex-imagegen",
-      "displayName": "Codex Imagegen",
-      "source": "./plugins/codex-imagegen",
-      "description": "Generate images via Codex's built-in $imagegen skill, land them in the project, and auto-clean the generated_images cache so storage stays flat.",
-      "version": "1.0.0",
-      "author": {
-        "name": "Nathan Onn"
-      },
-      "license": "MIT",
-      "keywords": ["image", "imagegen", "codex", "generate", "featured-image", "media"],
-      "category": "media"
+      "keywords": ["orchestration", "sub-agents", "delegation", "model-routing", "worktrees", "workflow"],
+      "category": "workflow"
     },
     {
       "name": "handoff-doc",
@@ -100,11 +48,102 @@
       "category": "workflow"
     },
     {
+      "name": "cli-spec-to-goal",
+      "displayName": "CLI Spec to Goal",
+      "source": "./plugins/cli-spec-to-goal",
+      "description": "Convert a Node.js CLI tool specification into a Codex /goal-ready bundle with AI-agent-friendly patterns baked in.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Onn"
+      },
+      "license": "MIT",
+      "keywords": ["cli", "nodejs", "codex", "goal", "specification", "scaffold"],
+      "category": "codex-goal"
+    },
+    {
+      "name": "webg-spec-to-goal",
+      "displayName": "Web Game Spec to Goal",
+      "source": "./plugins/webg-spec-to-goal",
+      "description": "Convert a web game idea into a complete Codex /goal-ready Phaser 3 project with scaffold, goals-plan, and all goal folders.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Onn"
+      },
+      "license": "MIT",
+      "keywords": ["game", "phaser", "codex", "goal", "specification", "scaffold"],
+      "category": "codex-goal"
+    },
+    {
+      "name": "wp-spec-to-goal",
+      "displayName": "WordPress Spec to Goal",
+      "source": "./plugins/wp-spec-to-goal",
+      "description": "Convert a WordPress plugin or feature idea into a Codex /goal-ready bundle with wp-env + Playwright verification.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Onn"
+      },
+      "license": "MIT",
+      "keywords": ["wordpress", "plugin", "codex", "goal", "specification", "scaffold"],
+      "category": "wordpress"
+    },
+    {
+      "name": "wp-requirements-to-goals",
+      "displayName": "WordPress Requirements to Goals",
+      "source": "./plugins/wp-requirements-to-goals",
+      "description": "Convert a full WordPress plugin requirements.md into a complete Codex /goal-ready project: goals-plan.md, root scaffold, and a layered goals/ tree (foundation, per-US, non-US, integration).",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Onn"
+      },
+      "license": "MIT",
+      "keywords": ["wordpress", "plugin", "codex", "goal", "requirements", "multi-goal", "scaffold"],
+      "category": "wordpress"
+    },
+    {
+      "name": "prototype-wp",
+      "displayName": "Prototype WordPress Plugin",
+      "source": "./plugins/prototype-wp",
+      "description": "Prototype a WordPress or WooCommerce plugin spec as a runnable offline browser simulation, to judge it as a product before writing any PHP.",
+      "version": "1.0.1",
+      "author": {
+        "name": "Nathan Onn"
+      },
+      "license": "MIT",
+      "keywords": ["wordpress", "woocommerce", "prototype", "simulation", "spec", "admin-ui"],
+      "category": "wordpress"
+    },
+    {
+      "name": "validate-block-markup",
+      "displayName": "Validate Block Markup",
+      "source": "./plugins/validate-block-markup",
+      "description": "Validate, diagnose or repair serialized WordPress block markup against the core block library in Node.js, with separate verdicts for validity and portability.",
+      "version": "1.0.1",
+      "author": {
+        "name": "Nathan Onn"
+      },
+      "license": "MIT",
+      "keywords": ["wordpress", "gutenberg", "blocks", "validation", "portability", "block-markup"],
+      "category": "wordpress"
+    },
+    {
+      "name": "wp-rest-api",
+      "displayName": "WP REST API",
+      "source": "./plugins/wp-rest-api",
+      "description": "Push block markup, CSS and JS into a WordPress site over the core REST API with an admin Application Password. Uses curl and jq only.",
+      "version": "1.0.1",
+      "author": {
+        "name": "Nathan Onn"
+      },
+      "license": "MIT",
+      "keywords": ["wordpress", "rest-api", "block-markup", "global-styles", "application-password", "gutenberg"],
+      "category": "wordpress"
+    },
+    {
       "name": "extract-design-md",
       "displayName": "Extract DESIGN.md",
       "source": "./plugins/extract-design-md",
-      "description": "Extract a website's design system into a DESIGN.md file (google-labs-code/design.md format) — colors, typography, radius/spacing scales, components, and brand feel — via playwright-cli token extraction plus the official linter.",
-      "version": "1.0.0",
+      "description": "Extract a website's design system into a DESIGN.md file (google-labs-code format): colors, typography, spacing, components and brand feel, checked by the official linter.",
+      "version": "1.0.1",
       "author": {
         "name": "Nathan Onn"
       },
@@ -116,8 +155,8 @@
       "name": "extract-design-system",
       "displayName": "Extract Design System",
       "source": "./plugins/extract-design-system",
-      "description": "Extract a website's full design system — tokens plus a curated component catalog (anatomy, variants, hover/focus states, section patterns) with DTCG tokens and an emitted eval harness — as a bundle a coding agent consumes to build new pages native to the source brand.",
-      "version": "1.0.0",
+      "description": "Extract a website's tokens and component catalog (variants, states, section patterns) into a bundle a coding agent uses to build pages native to that brand.",
+      "version": "1.0.1",
       "author": {
         "name": "Nathan Onn"
       },
@@ -139,43 +178,17 @@
       "category": "design"
     },
     {
-      "name": "prototype-wp",
-      "displayName": "Prototype WordPress Plugin",
-      "source": "./plugins/prototype-wp",
-      "description": "Prototype a WordPress or WooCommerce plugin from its written spec as a runnable offline browser simulation, so the spec can be evaluated as a product before any PHP is written.",
+      "name": "codex-imagegen",
+      "displayName": "Codex Imagegen",
+      "source": "./plugins/codex-imagegen",
+      "description": "Generate images via Codex's built-in $imagegen skill, land them in the project, and auto-clean the generated_images cache so storage stays flat.",
       "version": "1.0.0",
       "author": {
         "name": "Nathan Onn"
       },
       "license": "MIT",
-      "keywords": ["wordpress", "woocommerce", "prototype", "simulation", "spec", "admin-ui"],
-      "category": "development"
-    },
-    {
-      "name": "validate-block-markup",
-      "displayName": "Validate Block Markup",
-      "source": "./plugins/validate-block-markup",
-      "description": "Validate, diagnose, or repair standalone serialized WordPress Gutenberg block markup against the core block library running in Node.js, treating structural validity and cross-site portability as separate verdicts.",
-      "version": "1.0.0",
-      "author": {
-        "name": "Nathan Onn"
-      },
-      "license": "MIT",
-      "keywords": ["wordpress", "gutenberg", "blocks", "validation", "portability", "block-markup"],
-      "category": "development"
-    },
-    {
-      "name": "wp-rest-api",
-      "displayName": "WP REST API",
-      "source": "./plugins/wp-rest-api",
-      "description": "Push generated block markup, CSS and JS animation into a WordPress site over the core REST API, authenticated with an admin Application Password — curl and jq only, no MCP server, no CLI, no SSH.",
-      "version": "1.0.0",
-      "author": {
-        "name": "Nathan Onn"
-      },
-      "license": "MIT",
-      "keywords": ["wordpress", "rest-api", "block-markup", "global-styles", "application-password", "gutenberg"],
-      "category": "development"
+      "keywords": ["image", "imagegen", "codex", "generate", "featured-image", "media"],
+      "category": "media"
     },
     {
       "name": "wp-credential-guard",
@@ -188,33 +201,20 @@
       },
       "license": "MIT",
       "keywords": ["wordpress", "credentials", "application-password", "redaction", "hooks", "security"],
-      "category": "development"
+      "category": "hooks"
     },
     {
       "name": "context-alert",
       "displayName": "Context Alert",
       "source": "./plugins/context-alert",
       "description": "Opens a question dialog when the context window passes a threshold (40% by default) and offers a handoff doc, without blocking background agents.",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "author": {
         "name": "Nathan Onn"
       },
       "license": "MIT",
       "keywords": ["context", "handoff", "alert", "mod", "hooks"],
-      "category": "workflow"
-    },
-    {
-      "name": "orchestrate",
-      "displayName": "Orchestrate",
-      "source": "./plugins/orchestrate",
-      "description": "Run the main Claude Code session as an orchestrator: a task list, sub-agents routed by model and effort, and verified checkpoint commits.",
-      "version": "1.1.0",
-      "author": {
-        "name": "Nathan Onn"
-      },
-      "license": "MIT",
-      "keywords": ["orchestration", "sub-agents", "delegation", "model-routing", "worktrees", "workflow"],
-      "category": "workflow"
+      "category": "hooks"
     }
   ]
 }

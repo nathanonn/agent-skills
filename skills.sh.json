@@ -3,34 +3,14 @@
   "notGrouped": "bottom",
   "groupings": [
     {
-      "title": "Planning",
-      "description": "Skills for clarifying ambiguous work before execution.",
-      "skills": ["ask-first"]
-    },
-    {
-      "title": "Orchestration",
-      "description": "Skills that turn the main session into an orchestrator for sub-agents.",
-      "skills": ["orchestrate"]
+      "title": "Workflow",
+      "description": "Skills for clarifying, orchestrating and handing off work.",
+      "skills": ["ask-first", "orchestrate", "handoff-doc"]
     },
     {
       "title": "Codex /goal",
       "description": "Skills that produce Codex /goal-ready implementation bundles.",
       "skills": ["cli-spec-to-goal", "webg-spec-to-goal"]
-    },
-    {
-      "title": "Media",
-      "description": "Skills for generating images and visual assets.",
-      "skills": ["codex-imagegen"]
-    },
-    {
-      "title": "Documentation",
-      "description": "Skills for capturing work so it can be handed off and resumed.",
-      "skills": ["handoff-doc"]
-    },
-    {
-      "title": "Design",
-      "description": "Skills for capturing, reverse-engineering, and packaging a site's visual design system for reuse.",
-      "skills": ["extract-design-md", "extract-design-system", "design-system-to-skill"]
     },
     {
       "title": "WordPress",
@@ -42,6 +22,16 @@
         "validate-block-markup",
         "wp-rest-api"
       ]
+    },
+    {
+      "title": "Design",
+      "description": "Skills for capturing, reverse-engineering, and packaging a site's visual design system for reuse.",
+      "skills": ["extract-design-md", "extract-design-system", "design-system-to-skill"]
+    },
+    {
+      "title": "Media",
+      "description": "Skills for generating images and visual assets.",
+      "skills": ["codex-imagegen"]
     }
   ]
 }

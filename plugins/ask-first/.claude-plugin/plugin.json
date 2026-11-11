@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "ask-first",
   "displayName": "Ask First",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Ask clarifying questions before executing tasks. Reaches 95% confidence through structured Q&A, then executes.",
   "author": {
     "name": "Nathan Onn",

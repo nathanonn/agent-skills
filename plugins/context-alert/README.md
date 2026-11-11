@@ -2,7 +2,9 @@
 
 A Claude Code mod that notices when your context window is getting heavy and offers to write a handoff doc before compaction.
 
-**Version 0.1.1, beta.** The core flow is verified live. Some behaviour is not yet verified live (see Known limits).
+Version 0.1.2 · Works with: Claude Code plugin (marketplace install only)
+
+**Beta.** The core flow is verified live. Some behaviour is not yet verified live (see Known limits).
 
 After every main-thread turn, Claude Code reports how full the context is. When the fill reaches **40% of the window** (the default), Context Alert opens a question dialog. You can switch to a token limit, or use both (see Trigger modes below):
 
