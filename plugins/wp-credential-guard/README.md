@@ -4,6 +4,8 @@
 
 You paste a credential into the conversation because the work needs it. The model reads a placeholder instead. When the model writes a Bash command using that placeholder, the shell gets the real value back.
 
+Version 1.0.0 · Works with: Claude Code plugin (marketplace install only)
+
 By [Nathan Onn](https://github.com/nathanonn)
 
 ---
@@ -146,6 +148,8 @@ The stop list is hand-built and, as the code says, never finishes. It is the fir
 **The username is only partly protected.** A generic account name — `admin`, `root`, `editor`, `wordpress`, and the rest of the `GENERIC_USER` set — is masked where a rule finds it, but is never swept for afterwards, because those are words before they are names. A distinctive name is swept only *after* a structural form identified it once; a bare mention before that is left alone. **A username shorter than four characters is never swept at all** — `bob`, `ann`, `kim` are masked where a rule finds them and silently missed everywhere else, because three letters match too much ordinary text to hunt for. Put plainly: **a site URL and a username are the pair most likely to still be sitting in a transcript.** The Application Password is the part this plugin defends properly.
 
 **Untested surfaces.** None of the following was investigated, and each would need its own event or its own measurement: subagent preload, compaction, `/resume`, session export, another plugin loaded alongside this one and rewriting text after it, and any host other than an interactive terminal (`--print`, the SDK host, a resumed session each queue prompts differently). Whether a live WordPress accepts an expanded credential is also out of scope — the round trip proves byte fidelity through bash, not that `curl` authenticates.
+
+To confirm it works on your machine, run the five checks in [VERIFICATION.md](VERIFICATION.md).
 
 ---
 
