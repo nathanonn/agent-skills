@@ -355,16 +355,20 @@ fi
 
 SIZE_SET=0
 SIZE=""
+SIZE_SOURCE=""
 if [[ -v 'CONFIG_VALUES[imagegen.size]' ]]; then
   SIZE_SET=1
   SIZE="${CONFIG_VALUES[imagegen.size]}"
+  SIZE_SOURCE="config:${CONFIG_SOURCES[imagegen.size]}"
 fi
 
 STYLE_SET=0
 STYLE=""
+STYLE_SOURCE=""
 if [[ -v 'CONFIG_VALUES[imagegen.style]' ]]; then
   STYLE_SET=1
   STYLE="${CONFIG_VALUES[imagegen.style]}"
+  STYLE_SOURCE="config:${CONFIG_SOURCES[imagegen.style]}"
 fi
 
 DEST_CONTAINER=""
@@ -411,7 +415,7 @@ PROMPT+='Save the final image file(s) into this exact directory: '"$DEST"
 # --skip-git-repo-check is required: codex exec refuses to start in a directory
 # that is neither a git repo nor a trusted project, and image generation is
 # routinely run from ordinary folders. The workspace-write sandbox still applies.
-CODEX_ARGV=(codex exec --sandbox workspace-write --skip-git-repo-check --add-dir "$DEST")
+CODEX_ARGV=(codex exec --color never --sandbox workspace-write --skip-git-repo-check --add-dir "$DEST")
 if [ "$PROFILE_EXISTS" -eq 1 ]; then
   CODEX_ARGV+=(-p imagegen)
 fi
@@ -443,9 +447,11 @@ echo "DEST=$DEST"
 echo "DEST_SOURCE=$DEST_SOURCE"
 if [ "$SIZE_SET" -eq 1 ]; then
   echo "SIZE=$SIZE"
+  echo "SIZE_SOURCE=$SIZE_SOURCE"
 fi
 if [ "$STYLE_SET" -eq 1 ]; then
   echo 'STYLE=set'
+  echo "STYLE_SOURCE=$STYLE_SOURCE"
 fi
 
 if ! command -v codex >/dev/null 2>&1; then
@@ -569,39 +575,74 @@ fi
 mkdir -p "$DEST"
 mkdir -p "$GEN_DIR"
 
-BEFORE=$(find "$GEN_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort)
 # Only image files count as delivered output. A stray notes.txt must not be
 # mistaken for success, because that would also delete the thread folder
 # still holding the real image.
 IMAGE_FIND_ARGS=(-maxdepth 1 -type f '(' -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' ')')
+# Delivered files are detected by diffing the destination before and after.
+# Known limit: two runs writing into the SAME destination at the same time can
+# fool this diff. Run A can count run B's new file as its own, skip the rescue
+# and delete A's session folder, losing A's image. Runs into different
+# destinations are safe; do not run two into one destination at once.
 DEST_BEFORE=$(find "$DEST" "${IMAGE_FIND_ARGS[@]}" 2>/dev/null | sort)
 
-RUN_OK=1
-"${CODEX_ARGV[@]}" < /dev/null || RUN_OK=0
+# Capture codex's stderr (its header carries the session id) while still
+# streaming it live to our stderr. Stdout passes through unchanged.
+ERR_FILE=$(mktemp "${TMPDIR:-/tmp}/codex-imagegen-err.XXXXXX") || ERR_FILE=""
+if [ -n "$ERR_FILE" ]; then
+  # Chain onto any EXIT trap that is already set instead of replacing it.
+  PREV_EXIT_TRAP=$(
+    eval "set -- $(trap -p EXIT)"
+    printf '%s' "${3:-}"
+  )
+  trap 'rm -f "$ERR_FILE"; '"$PREV_EXIT_TRAP" EXIT
+else
+  ERR_FILE=/dev/null
+fi
 
-AFTER=$(find "$GEN_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort)
-NEW_THREADS=$(comm -13 <(printf '%s\n' "$BEFORE") <(printf '%s\n' "$AFTER"))
+RUN_OK=1
+CODEX_RC=0
+{
+  "${CODEX_ARGV[@]}" < /dev/null 2>&1 1>&3 3>&- | tee "$ERR_FILE" >&2 3>&-
+  CODEX_RC=${PIPESTATUS[0]}
+} 3>&1
+[ "$CODEX_RC" -eq 0 ] || RUN_OK=0
+
+# The run's cache folder is named after its Codex session id, printed in the
+# stderr header as a line "session id: <uuid>". Only that folder is ever
+# touched, so concurrent runs cannot take each other's images or folders.
+# Parse only the header (between the first and second "--------" lines), so a
+# prompt echoed after it that mentions another session id is never picked up.
+SESSION_ID=$(tr -d '\r' < "$ERR_FILE" 2>/dev/null | awk '
+  /^--------$/ { n++; if (n >= 2) exit; next }
+  n == 1 && /^session id: [0-9a-f-]+$/ { sub(/^session id: /, ""); if (length($0) == 36) { print; exit } }
+')
+THREAD_DIR=""
+if [ -n "$SESSION_ID" ]; then
+  if [ -d "$GEN_DIR/$SESSION_ID" ] && [ ! -L "$GEN_DIR/$SESSION_ID" ]; then
+    THREAD_DIR="$GEN_DIR/$SESSION_ID"
+  fi
+fi
+echo "SESSION_ID=${SESSION_ID:-unknown}"
 
 DEST_AFTER=$(find "$DEST" "${IMAGE_FIND_ARGS[@]}" 2>/dev/null | sort)
 NEW_FILES=$(comm -13 <(printf '%s\n' "$DEST_BEFORE") <(printf '%s\n' "$DEST_AFTER"))
 
-if [ -z "$NEW_FILES" ] && [ -n "$NEW_THREADS" ]; then
-  while IFS= read -r thread_dir; do
-    [ -n "$thread_dir" ] || continue
-    find "$thread_dir" -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) -exec mv -n {} "$DEST"/ \;
-  done <<< "$NEW_THREADS"
+if [ -z "$NEW_FILES" ] && [ -n "$THREAD_DIR" ]; then
+  find "$THREAD_DIR" -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) -exec mv -n {} "$DEST"/ \;
   DEST_AFTER=$(find "$DEST" "${IMAGE_FIND_ARGS[@]}" 2>/dev/null | sort)
   NEW_FILES=$(comm -13 <(printf '%s\n' "$DEST_BEFORE") <(printf '%s\n' "$DEST_AFTER"))
 fi
 
-if [ -n "$NEW_FILES" ] && [ -n "$NEW_THREADS" ]; then
-  while IFS= read -r thread_dir; do
-    [ -n "$thread_dir" ] || continue
-    rm -rf "$thread_dir"
-  done <<< "$NEW_THREADS"
-  echo "CLEANUP=removed this run's thread folder(s)"
-elif [ -n "$NEW_THREADS" ]; then
-  echo "CLEANUP=skipped (no file confirmed at destination; originals kept in $GEN_DIR)"
+if [ -z "$SESSION_ID" ]; then
+  echo "CLEANUP=skipped (could not read the codex session id; nothing under $GEN_DIR was touched)"
+elif [ -z "$THREAD_DIR" ]; then
+  echo "CLEANUP=none (no cache folder for session $SESSION_ID)"
+elif [ -n "$NEW_FILES" ]; then
+  rm -rf "$THREAD_DIR"
+  echo "CLEANUP=removed this run's session folder ($THREAD_DIR)"
+else
+  echo "CLEANUP=skipped (no file confirmed at destination; originals kept in $THREAD_DIR)"
 fi
 
 if [ -n "$NEW_FILES" ]; then
@@ -609,6 +650,11 @@ if [ -n "$NEW_FILES" ]; then
   echo "$NEW_FILES"
 else
   echo "ERROR: no new image file found at $DEST after the run." >&2
+  if [ -n "$THREAD_DIR" ]; then
+    echo "Originals, if any, were kept in $THREAD_DIR" >&2
+  elif [ -z "$SESSION_ID" ]; then
+    echo "The codex session id was unknown, so images may still be under $GEN_DIR" >&2
+  fi
   RUN_OK=0
 fi
 
