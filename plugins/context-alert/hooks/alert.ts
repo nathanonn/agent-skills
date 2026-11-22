@@ -1,20 +1,11 @@
 import type { EngineInterface } from 'claude-code'
+import { compactNow, runHandoff, startFlow, type Flow } from './flow'
+import type { TurnOrigin } from './flow-logic'
 import {
-  classifyAskError, COMPACT_AFTER_MAX_TURNS, dialogOptions, formatTokens, isBusyStatus, nextThreshold, questionText, rearm, shouldFire,
+  classifyAskError, dialogOptions, formatTokens, isBusyStatus, nextThreshold, questionText, rearm, shouldFire,
   type Asked, type Config,
 } from './logic'
 import { loadConfig, recordTier, unrecordTier, updateSession } from './state'
-
-// The two skill ids are named in full so Claude resolves the project's copy first, then the bundled one.
-const NO_PATH_PROMPT =
-  'Context is getting heavy, so I want a handoff doc now. Use the skill `handoff-doc` if this project ' +
-  'has one, otherwise the bundled skill `context-alert:handoff-doc`. Ask me for the destination path ' +
-  'with AskUserQuestion, and recommend one based on this project\'s handoff folder and its naming ' +
-  'pattern if it has one.'
-
-const withPathPrompt = (path: string) =>
-  `Context is getting heavy, so please update the handoff doc at ${path} now, using the skill ` +
-  '`handoff-doc` if this project has one, otherwise the bundled skill `context-alert:handoff-doc`.'
 
 /**
  * Per-load state of the hooks module (its "module variables"). One object, created by `register`,
@@ -38,19 +29,39 @@ export type Runtime = {
   /** Consecutive refused dialogs; after MAX_REFUSALS the tier is consumed so it cannot loop. */
   refusals: number
   /**
-   * "Handoff, then compact" is waiting for the handoff turn: `wrote` once a main-thread Write/Edit of a .md
-   * lands, `turns` counts main turns ended without one. Cleared on compaction or when it gives up.
+   * A handoff-compact flow (`/handoff-compact`, or the dialog's "Handoff, then compact"): see flow.ts.
+   * Cleared when it compacts, is cancelled or gives up, or by any main-thread compaction. Alerts are held meanwhile.
    */
-  compactAfter?: { wrote: boolean; turns: number }
+  flow?: Flow
+  /** The flow that just asked for a compaction waited for agents: session.compact sends the notification. */
+  notifyOnCompact: boolean
+  /** Origin of the prompt about to start a main turn (recorded by prompt.submit, taken by turn.start). */
+  nextTurnOrigin?: TurnOrigin
+  /** Origin of the main turn running or last ended; undefined when this mod did not see its prompt. */
+  turnOrigin?: TurnOrigin
   /** A compaction this mod started is queued: no dialog until it lands (session.compact) or a main turn starts. */
   compacting: boolean
 }
 
 export const MAX_REFUSALS = 3
 
+/** /clear or an in-process /resume: the conversation this state described is gone, the process goes on. */
+export function resetConversation(rt: Runtime): void {
+  rt.flow = undefined
+  rt.notifyOnCompact = false
+  rt.compacting = false
+  rt.pending = false
+  rt.suggestAnnounced = undefined
+  rt.refusals = 0
+  rt.mainTurnRunning = false
+  rt.backgroundTasks = 0
+  rt.nextTurnOrigin = undefined
+  rt.turnOrigin = undefined
+}
+
 export const newRuntime = (): Runtime => ({
   mainTurnRunning: false, pending: false, asking: false, interactive: true, backgroundTasks: 0, refusals: 0,
-  compacting: false,
+  compacting: false, notifyOnCompact: false,
 })
 
 export type Fill = { percent: number | undefined; tokens: number | undefined; window: number }
@@ -62,56 +73,6 @@ export async function getConfig($: EngineInterface, rt: Runtime): Promise<Config
 export async function refreshConfig($: EngineInterface, rt: Runtime): Promise<Config> {
   rt.config = await loadConfig($)
   return rt.config
-}
-
-/** project skill, then the bundled copy, then a plain prompt. Never throws. */
-export async function runHandoff($: EngineInterface, path: string | undefined): Promise<void> {
-  try {
-    if (path) {
-      try {
-        await $.command.run({ command: 'handoff-doc', args: path })
-        $.ui.log('context-alert: handoff via command handoff-doc')
-        return
-      } catch { /* no project skill, or $.command.run cannot run skills */ }
-      try {
-        await $.command.run({ command: 'context-alert:handoff-doc', args: path })
-        $.ui.log('context-alert: handoff via command context-alert:handoff-doc')
-        return
-      } catch { /* fall through */ }
-      $.ui.log('context-alert: handoff via prompt (update, known path)')
-      await $.prompt.submit({ text: withPathPrompt(path), asUser: true })
-      return
-    }
-    // No known path: skip the commands (they need an argument) and let Claude pick the skill and ask for the path.
-    $.ui.log('context-alert: handoff via prompt (no known path)')
-    await $.prompt.submit({ text: NO_PATH_PROMPT, asUser: true })
-  } catch (err) {
-    try { $.ui.log(`context-alert: handoff failed: ${String(err)}`) } catch { /* ignore */ }
-  }
-}
-
-/** /compact queued until idle; on a rejection, session.compact(); then a toast. Never throws. */
-export async function compactNow($: EngineInterface, rt?: Runtime): Promise<void> {
-  if (rt) rt.compacting = true
-  try {
-    await $.command.run({ command: 'compact' })
-    return
-  } catch (err) {
-    try { $.ui.log(`context-alert: /compact via command failed: ${String(err)}`, { to: 'debug' }) } catch { /* ignore */ }
-  }
-  let why: string
-  try {
-    const result = await $.session.compact()
-    if (!result.skip) return
-    why = `vetoed: ${result.skip}` // another plugin's hook skipped it
-  } catch (err) {
-    why = `rejected: ${String(err)}`
-  }
-  if (rt) rt.compacting = false
-  try {
-    $.ui.log(`context-alert: session.compact ${why}`)
-    $.ui.toast("Compaction couldn't start; run /compact")
-  } catch { /* ignore */ }
 }
 
 /** busy = an agent pending, running or waiting, or background work seen at the last Stop. */
@@ -140,6 +101,7 @@ async function currentFill($: EngineInterface): Promise<Fill | undefined> {
  */
 export async function tryAlert($: EngineInterface, rt: Runtime, given?: Fill): Promise<void> {
   if (rt.asking || rt.compacting) return
+  if (rt.flow) { rt.pending = true; return } // held while a handoff-compact flow runs (D25); retried once it ends
   if (rt.mainTurnRunning) { rt.pending = true; return }
   rt.asking = true // held from the decision through the answer, so two callers cannot both decide
   let action: { kind: 'handoff'; thenCompact: boolean } | { kind: 'compact' } | { kind: 'text'; text: string } | undefined
@@ -222,39 +184,11 @@ export async function tryAlert($: EngineInterface, rt: Runtime, given?: Fill): P
   // The dialog is closed; run the chosen action outside the guard.
   try {
     if (action?.kind === 'handoff') {
-      // Armed before the handoff is queued, so its turn's writes are counted (see afterMainTurn).
-      rt.compactAfter = action.thenCompact ? { wrote: false, turns: 0 } : undefined
-      await runHandoff($, handoff)
+      // "Handoff, then compact" is the same flow as /handoff-compact (D25), with the agent wait.
+      if (action.thenCompact) await startFlow($, rt, { source: 'dialog', path: handoff, force: false })
+      else await runHandoff($, handoff)
     }
     else if (action?.kind === 'compact') await compactNow($, rt)
     else if (action?.kind === 'text') await $.prompt.submit({ text: action.text, asUser: true })
-  } catch { /* ignore */ }
-}
-
-/**
- * "Handoff, then compact": called at each main turn.complete. Compacts once a turn that wrote a .md ends
- * normally; gives up on an interrupted or failed turn, or after COMPACT_AFTER_MAX_TURNS turns with no write.
- * Never throws.
- */
-export async function afterMainTurn($: EngineInterface, rt: Runtime, ended: { isAborted: boolean; reason: string }): Promise<void> {
-  const c = rt.compactAfter
-  if (!c) return
-  try {
-    if (ended.isAborted || ended.reason !== 'answer') {
-      rt.compactAfter = undefined
-      $.ui.toast('Handoff turn did not finish, so no compaction. Run /compact when ready.')
-      return
-    }
-    if (c.wrote) {
-      rt.compactAfter = undefined
-      $.ui.toast('Handoff doc written. Compacting.')
-      await compactNow($, rt)
-      return
-    }
-    c.turns++
-    if (c.turns >= COMPACT_AFTER_MAX_TURNS) {
-      rt.compactAfter = undefined
-      $.ui.toast('No handoff doc was written, so no compaction. Run /compact when ready.')
-    }
   } catch { /* ignore */ }
 }

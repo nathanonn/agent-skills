@@ -2,7 +2,7 @@
 
 A Claude Code mod that notices when your context window is getting heavy and offers to write a handoff doc before compaction.
 
-Version 0.1.2 · Works with: Claude Code plugin (marketplace install only)
+Version 0.2.0 · Works with: Claude Code plugin (marketplace install only)
 
 **Beta.** The core flow is verified live. Some behaviour is not yet verified live (see Known limits).
 
@@ -25,7 +25,7 @@ The dialog never opens in the middle of a turn. If the fill crosses a threshold 
 
 | Option | What happens |
 |---|---|
-| Handoff, then compact | Runs the handoff chain below, then compacts once the handoff turn ends with a `.md` written. It waits up to 3 turns (for example while Claude asks for the path). An interrupted turn, or 3 turns with no write, cancels the compaction with a toast |
+| Handoff, then compact | Runs the same flow as `/handoff-compact` (see below): the handoff chain, a wait for busy agents, then compaction. Alert dialogs are held while it runs. An interrupted turn, or 3 turns with no write, cancels the compaction with a toast |
 | Handoff only | Runs the handoff chain below and leaves the context alone, for when you'd rather `/clear` and start fresh from the doc |
 | Compact now | Queues `/compact`, which runs once the session is idle. If that is refused it tries the compaction call directly, and if that fails too it shows "Compaction couldn't start; run /compact" |
 | Not now | Nothing. The next alert steps up one tier (+15 points by default; +150k tokens in tokens mode; whichever comes first in either mode) |
@@ -69,6 +69,33 @@ The plugin learns the path from `/handoff-doc <path>` typed by you, from handoff
 
 On a fresh start of Claude Code with a resumed session, it also looks back through the transcript for the same three signals: handoff-doc Skill calls, writes into a `handoff/` folder, and a typed `/handoff-doc <path>` in your messages. That scan runs only at process start. An in-process `/resume` or `/clear` does not re-scan.
 
+## The /handoff-compact command
+
+```
+/handoff-compact [now] [path]
+```
+
+Writes the handoff doc, then compacts. It works even when `enabled` is false.
+
+- **Path.** The argument if given, else the session's known handoff path, else Claude asks you and recommends one (see The handoff chain).
+- **Compaction.** Runs with focus instructions that name the doc, so the summary keeps its path and open follow-ups.
+- **Agents.** Before compacting it waits for busy agents (pending, running or waiting). The toast reads `Waiting for N agents before compacting`. Shells, monitors and workflows are not waited on.
+- **Finished agents.** An agent that ends during the wait gets a follow-up prompt that folds its result into the doc in place. Then compaction runs.
+- **`now`.** Skips the wait. The doc is still written first.
+- **Running it twice.** While a flow is in progress, a second `/handoff-compact` toasts "already in progress". `now` upgrades the running flow to skip the wait.
+- **Dialog.** The dialog's "Handoff, then compact" uses the same flow. Alert dialogs are held while a flow is in progress.
+- **Notification.** Sent after compaction only if the flow waited for agents and `notify` is on.
+
+Ways out:
+
+| What happens | Result |
+|---|---|
+| You type a message, or send one from Remote Control, during the wait | Cancelled, with a toast |
+| Agent reports, the mod's own prompts, slash commands | The wait goes on |
+| Esc during the handoff turn | No compaction |
+| 3 main turns with no `.md` written | Gives up (writing phase only) |
+| Agents never finish | It waits. There is no timeout. Send a message to cancel, or run `/handoff-compact now` |
+
 ## The `/context-alert` command
 
 ```
@@ -84,7 +111,7 @@ Anything else after `reset` prints the usage text and changes nothing.
 
 | Key | Default | Values |
 |---|---|---|
-| `enabled` | `true` | `true` / `false`. When false, nothing runs, including toast and notification |
+| `enabled` | `true` | `true` / `false`. When false, no alert runs, including toast and notification. `/handoff-compact` still runs, since you start it yourself |
 | `trigger` | `percent` | `percent` / `tokens` / `either`. Which limit counts (see Trigger modes) |
 | `percent` | `40` | first alert at this percent of the window (above 0, up to 100; decimals such as 0.5 are accepted). Setting it switches the trigger to `percent` |
 | `tokens` | `300000` | first alert at this many tokens (whole number). Setting it switches the trigger to `tokens` |
@@ -150,6 +177,10 @@ Not yet verified live:
 - Whether `$.command.run` can run a skill at all. If not, the chain falls to step 3, the prompt.
 - What happens when the dialog fires while you are typing a draft, or while Claude's own question dialog is open.
 - The exact input shape of the Skill tool, used to learn the handoff path. Each handoff-doc Skill call logs its raw shape to the debug log.
+- `/handoff-compact` (new in 0.2.0) has passed headless tests only. None of it has been run live yet.
+- Whether `/compact <focus>` run by the mod honours the focus text. The fallback is `$.session.compact` with the instructions.
+- An agent that finishes during the `/handoff-compact` wait is noticed only at the next main turn end, not the moment it finishes.
+- The notification after a waited `/handoff-compact` depends on the mod hearing its own compaction.
 - Where the dialog appears on a phone or remote surface.
 - Headless runs (`-p`) have no dialog and no notification. The plugin stays silent.
 - Fill is unknown on a fresh or just-compacted session; the plugin skips until a response reports it.

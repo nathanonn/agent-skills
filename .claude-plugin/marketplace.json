@@ -220,8 +220,8 @@
       "name": "context-alert",
       "displayName": "Context Alert",
       "source": "./plugins/context-alert",
-      "description": "Opens a question dialog when the context window passes a threshold (40% by default) and offers a handoff doc, without blocking background agents.",
-      "version": "0.1.2",
+      "description": "Opens a question dialog when the context window passes a threshold (40% by default), offers a handoff doc, and adds /handoff-compact.",
+      "version": "0.2.0",
       "author": {
         "name": "Nathan Onn"
       },

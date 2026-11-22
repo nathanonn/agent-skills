@@ -59,7 +59,7 @@ These run code on Claude Code's events, so they install through the marketplace 
 | Plugin | What it does | Say | Works with |
 |---|---|---|---|
 | [wp-credential-guard](plugins/wp-credential-guard/README.md) | Masks WordPress usernames and Application Passwords in prompts with session-scoped placeholders, and restores them into Bash commands at execution time. | (automatic) | Claude Code plugin |
-| [context-alert](plugins/context-alert/README.md) | Opens a question dialog when the context window passes a threshold (40% by default) and offers a handoff doc, without blocking background agents. | (automatic); `/context-alert` for settings | Claude Code plugin |
+| [context-alert](plugins/context-alert/README.md) | Opens a question dialog when the context window passes a threshold (40% by default), offers a handoff doc, and adds /handoff-compact. | (automatic); `/handoff-compact` on demand; `/context-alert` for settings | Claude Code plugin |
 
 ## Install
 

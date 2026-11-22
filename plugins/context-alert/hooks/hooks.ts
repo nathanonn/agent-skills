@@ -1,9 +1,10 @@
 import type { EngineInterface, Register } from 'claude-code'
-import { afterMainTurn, getConfig, newRuntime, refreshConfig, tryAlert, type Runtime } from './alert'
+import { getConfig, newRuntime, refreshConfig, resetConversation, tryAlert, type Runtime } from './alert'
 import { handleCommand } from './command'
+import { afterCompaction, noteFlowWrite, onFlowCommand, onFlowPrompt, onFlowTurnEnd } from './flow'
 import {
   belowFirst, crossed, extractHandoffPath, extractSkillHandoffPath, extractSlashHandoffPath, formatTokens, handoffPathFromWrite,
-  isHandoffSkill, isMarkdownWrite, nextThreshold, rearm, resetTiers, shouldToast, skillNameOf, type SessionState,
+  isHandoffSkill, isMarkdownWrite, nextThreshold, rearm, shouldToast, skillNameOf, type SessionState,
 } from './logic'
 import { loadSession, pruneSessions, rememberHandoffPath, updateSession } from './state'
 
@@ -68,6 +69,15 @@ async function onSessionStart($: EngineInterface, rt: Runtime): Promise<void> {
   } catch (err) {
     $.ui.log(`context-alert: could not register /context-alert: ${String(err)}`)
   }
+  try {
+    await $.command.register({
+      name: 'handoff-compact',
+      description: 'Write or update the handoff doc, wait for running agents, then compact (now: skip the wait)',
+      argumentHint: '[now] [path]',
+    })
+  } catch (err) {
+    $.ui.log(`context-alert: could not register /handoff-compact: ${String(err)}`)
+  }
   await refreshConfig($, rt).catch(quiet)
   await pruneSessions($).catch(quiet)
   await backfillHandoff($).catch(quiet)
@@ -108,6 +118,9 @@ export const register: Register = (on) => {
     if (e.agentId === undefined) {
       rt.mainTurnRunning = true
       rt.compacting = false // the compaction ran or was dropped; either way the session moved on
+      rt.notifyOnCompact = false // so a dropped compaction's notification cannot ride a later auto-compaction
+      rt.turnOrigin = rt.nextTurnOrigin // undefined: a prompt this mod did not see (its own, or queued mid-turn)
+      rt.nextTurnOrigin = undefined
     }
     return r
   })
@@ -115,11 +128,8 @@ export const register: Register = (on) => {
     const r = await next(e)
     if (e.agentId === undefined) {
       rt.mainTurnRunning = false
-      if (rt.compactAfter) {
-        // Mark the compaction before any alert can look, so a pending tier does not open a dialog first.
-        if (rt.compactAfter.wrote && !e.isAborted && e.reason === 'answer') rt.compacting = true
-        void afterMainTurn($, rt, e).catch(quiet)
-      }
+      // A flow holds every alert (tryAlert re-marks it pending), so a pending tier cannot open a dialog first.
+      if (rt.flow) void onFlowTurnEnd($, rt, e).catch(quiet)
       if (rt.pending) void tryAlert($, rt).catch(quiet)
     }
     return r
@@ -131,14 +141,9 @@ export const register: Register = (on) => {
     const r = await next(e)
     const skipped = (r as { skip?: string } | undefined)?.skip
     if (e.agentId === undefined && e.trigger !== 'precompute') rt.compacting = false
+    if (e.agentId === undefined && e.trigger !== 'precompute' && skipped) rt.notifyOnCompact = false
     if (e.agentId === undefined && e.trigger !== 'precompute' && !skipped) {
-      rt.pending = false
-      rt.suggestAnnounced = undefined
-      rt.compactAfter = undefined
-      void (async () => {
-        const sid = await $.session.id()
-        await updateSession($, sid, resetTiers)
-      })().catch(quiet)
+      void afterCompaction($, rt, e.instructions).catch(quiet) // tiers reset (D15), any flow ends (D26)
     }
     return r
   })
@@ -157,11 +162,14 @@ export const register: Register = (on) => {
     const r = await next(e)
     if (e.agentId === undefined) {
       void onToolCallToast($, rt).catch(quiet)
+      // A denied or failed Write/Edit wrote nothing: it neither records a path nor counts as the handoff written.
+      const res = r as { deny?: string; isError?: true } | undefined
+      if (res?.deny !== undefined || res?.isError) return r
       const filePath = (e as unknown as { file_path?: unknown }).file_path
       const written = handoffPathFromWrite(e.tool, filePath)
       if (written) void rememberHandoffPath($, written).catch(quiet)
-      // "Handoff, then compact": any .md written counts (the doc may live outside a handoff/ folder).
-      if (rt.compactAfter && isMarkdownWrite(e.tool, filePath)) rt.compactAfter.wrote = true
+      // The handoff-compact flow: any .md written counts (the doc may live outside a handoff/ folder).
+      if (rt.flow && isMarkdownWrite(e.tool, filePath)) noteFlowWrite(rt.flow, e.tool, filePath as string)
     }
     return r
   })
@@ -196,12 +204,42 @@ export const register: Register = (on) => {
     return r
   })
 
+  // /handoff-compact [now] [path]: answers at once with no text (toasts and the handoff turn say the rest);
+  // the flow runs detached, after the hook has returned.
+  on('command.run', { command: 'handoff-compact' }, async ($, e) => {
+    void onFlowCommand($, rt, e.args).catch(quiet)
+    return {}
+  })
+
+  // A typed (or Remote Control) message cancels a flow that waits for agents. prompt.submit carries no agentId:
+  // a sub-agent's prompt never raises it here. This mod's own prompts (kind plugin) skip its hooks anyway.
+  // The origin is noted before next(e), as the turn it starts begins inside it; a prompt typed or delivered
+  // over a running turn (turnId set) starts no turn of its own now, so it is not noted.
+  on('prompt.submit', async ($, e, next) => {
+    const noted = e.turnId === undefined
+      ? { kind: e.origin.kind, ...('name' in e.origin ? { name: e.origin.name } : {}) }
+      : undefined
+    if (noted) rt.nextTurnOrigin = noted
+    const r = await next(e)
+    if (noted && (r as { drop?: string } | undefined)?.drop && rt.nextTurnOrigin === noted) rt.nextTurnOrigin = undefined
+    try { onFlowPrompt($, rt, e) } catch { /* ignore */ }
+    return r
+  })
+
+  // /clear or an in-process /resume: a new conversation under the same process. Nothing of the old one's flow,
+  // queued compaction or pending alert may carry over (session.start does not fire for either).
+  on('session.end', async ($, e, next) => {
+    const r = await next(e)
+    if (e.reason === 'clear' || e.reason === 'resume') resetConversation(rt)
+    return r
+  })
+
   on('command.run', { command: 'context-alert' }, async ($, e) => {
     try {
       return {
         text: await handleCommand($, e.args, {
           onConfig: (cfg) => { rt.config = cfg },
-          onResetSession: () => { rt.pending = false; rt.suggestAnnounced = undefined; rt.refusals = 0; rt.compactAfter = undefined },
+          onResetSession: () => { rt.pending = false; rt.suggestAnnounced = undefined; rt.refusals = 0; rt.flow = undefined },
         }),
       }
     } catch (err) {

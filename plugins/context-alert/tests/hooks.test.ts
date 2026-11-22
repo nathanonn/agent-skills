@@ -1,131 +1,7 @@
-import { test, expect, mock, type TestBody } from 'claude-code/testing'
-
-type On = Parameters<TestBody>[1]
-type Dollar = Parameters<TestBody>[0]
-
-const DAY = 86_400_000
-const NOW = 100 * DAY
-
-type World = {
-  asks: { question: string; header: string; options: string[] }[]
-  toasts: string[]
-  suggests: string[]
-  notifies: { text: string; title?: string }[]
-  /** Whether the next $.prompt.suggest reports { isShown: true }; tests may flip it. */
-  suggestShown: boolean
-  submits: { text: string; asUser?: boolean }[]
-  runs: { command: string; args: string }[]
-  logs: string[]
-  compacts: number
-  registered: string[]
-  clock: ReturnType<typeof mock.clock>
-  store: Map<string, unknown>
-}
-
-type Opts = {
-  /** What the dialog answers; default "Not now". */
-  answer?: string | ((labels: string[]) => string)
-  agents?: { id: string; status: string }[]
-  /** Hold the dialog's answer on the mocked clock for this long. */
-  askDelayMs?: number
-  usage?: { percent?: number; tokens?: number }
-  store?: Record<string, unknown>
-  /** Command names whose $.command.run the world refuses. */
-  refuse?: string[]
-  /** The dialog is dismissed (the call rejects), as in -p runs. */
-  dismiss?: boolean
-  /** The dialog rejects with this message (a host refusal, not a dismissal). */
-  askError?: string
-  /** session.compact comes back vetoed ({ skip }); the kit cannot make it reject. */
-  compactRejects?: boolean
-  /** What $.session.messages() returns (resume backfill). */
-  messages?: unknown[]
-}
-
-// Every hook below stands for the engine: nothing sits beneath the plugin.
-function world($: Dollar, on: On, o: Opts = {}): World {
-  const w: World = {
-    asks: [], toasts: [], suggests: [], notifies: [], suggestShown: true, submits: [], runs: [], logs: [], compacts: 0,
-    registered: [], store: new Map(), clock: undefined as never,
-  }
-  for (const [k, v] of Object.entries(o.store ?? {})) w.store.set(k, JSON.parse(JSON.stringify(v)))
-  on('store.get', (_, e) => ({ value: w.store.get(e.key) }))
-  on('store.set', (_, e) => { w.store.set(e.key, JSON.parse(JSON.stringify(e.value))); return { value: undefined } })
-  on('store.delete', (_, e) => { w.store.delete(e.key); return { value: undefined } })
-  on('store.keys', () => ({ value: [...w.store.keys()] }))
-  w.clock = mock.clock(on, { now: NOW })
-  on('session.id', () => ({ value: 'S1' }))
-  on('session.start', (_, e) => ({ cwd: e.cwd }))
-  on('session.measure', (_, e) => ({ changed: e.changed }))
-  on('session.usage', () => ({
-    value: {
-      startedAt: 0,
-      context: { window: 1_000_000, percent: o.usage?.percent, tokens: o.usage?.tokens },
-      rateLimits: [],
-    },
-  }))
-  on('session.messages', () => ({ value: (o.messages ?? []) as never }))
-  on('session.compact', () => {
-    w.compacts++
-    // The kit skips a hook that throws, so a rejection cannot be driven here; a veto ({ skip }) takes the same exit.
-    if (o.compactRejects) return { skip: 'compaction refused while a turn runs' } as never
-    return { messages: [{ role: 'user', text: 'summary', toolUses: [] }] } as never
-  })
-  on('turn.start', (_, e) => ({ turnId: e.turnId }))
-  on('turn.complete', (_, e) => ({ text: e.answer }))
-  on('classic.Stop', () => ({}) as never)
-  on('agent.list', () => ({ value: (o.agents ?? []) as never }))
-  on('ui.notify', (_, e) => {
-    w.notifies.push({ text: e.text, title: (e as { title?: string }).title })
-    return { value: { isSent: false, reason: 'disabled' } }
-  })
-  on('ui.toast', (_, e) => { w.toasts.push(e.text); return { value: undefined } })
-  on('ui.log', (_, e) => { w.logs.push(e.text); return { value: undefined } })
-  on('command.register', (_, e) => { w.registered.push(e.name); return { value: { command: e.name } } })
-  on('prompt.suggest', (_, e) => { w.suggests.push(e.text); return { isShown: w.suggestShown } })
-  on('prompt.submit', (_, e) => { w.submits.push({ text: e.text, asUser: (e.origin as { asUser?: boolean }).asUser }); return { text: e.text } })
-  on('command.run', (_, e) => {
-    w.runs.push({ command: e.command, args: e.args })
-    if (o.refuse?.includes(e.command)) throw new Error(`unknown command ${e.command}`)
-    return { text: `ran ${e.command}` }
-  })
-  on('tool.call', async (_, e) => {
-    if (e.tool !== 'AskUserQuestion') return { result: {} } as never
-    // A hook's { deny } is how the kit makes $.ui.ask reject (a thrown error just skips the hook).
-    if (o.dismiss) return { deny: 'dismissed' } as never
-    if (o.askError) return { deny: o.askError } as never
-    const q = (e as unknown as { questions: { question: string; header: string; options: { label: string }[] }[] }).questions[0]!
-    const labels = q.options.map((x) => x.label)
-    w.asks.push({ question: q.question, header: q.header, options: labels })
-    if (o.askDelayMs) await w.clock.sleep(o.askDelayMs)
-    const a = typeof o.answer === 'function' ? o.answer(labels) : (o.answer ?? 'Not now')
-    return { result: { questions: [], answers: { [q.question]: a } } } as never
-  })
-  return w
-}
-
-const measure = (
-  $: Dollar, percent: number | undefined, tokens: number | undefined, changed: ('context' | 'rateLimits')[] = ['context'],
-) =>
-  $.session.measure({
-    context: { window: 1_000_000, percent, tokens },
-    rateLimits: [],
-    changed,
-  })
-
-// A slash command as the person types it (the engine stamps the origin and presentation).
-const typed = ($: Dollar, command: string, args: string) =>
-  $.command.run({ command, args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 80 } })
-
-const turnStart = ($: Dollar, agentId?: string) =>
-  $.turn.start({ text: 'go', turnId: agentId ? 'ta' : 'tm', ...(agentId ? { agentId } : {}) } as never)
-const turnEnd = ($: Dollar, agentId?: string) =>
-  $.turn.complete({
-    answer: 'done', durationMs: 1, isAborted: false, reason: 'answer', turnId: agentId ? 'ta' : 'tm',
-    ...(agentId ? { agentId } : {}),
-  } as never)
-
-const settle = async (w: World) => { await w.clock.settle(); await w.clock.settle(); await w.clock.settle() }
+import { test, expect } from 'claude-code/testing'
+import {
+  DAY, NOW, measure, settle, turnEnd, turnEndAs, turnStart, typed, world, writeMd, type Dollar, type World,
+} from './world'
 
 test('below threshold: no dialog', async ($, on) => {
   const w = world($, on)
@@ -246,6 +122,7 @@ test('handoff with no known path: a prompt asks Claude for the destination', asy
   expect(w.submits.length).toBe(1)
   expect(w.submits[0]!.text).toContain('handoff-doc')
   expect(w.submits[0]!.text).toContain('AskUserQuestion')
+  expect(w.submits[0]!.text.startsWith('Context is getting heavy')).toBe(true)
   expect(w.submits[0]!.text).toContain('`handoff-doc`')
   expect(w.submits[0]!.text).toContain('`context-alert:handoff-doc`')
   expect(w.logs.some((l) => l.includes('no known path'))).toBe(true)
@@ -387,7 +264,7 @@ test('session.start registers /context-alert and prunes old session entries', as
   })
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   await settle(w)
-  expect(w.registered).toEqual(['context-alert'])
+  expect(w.registered).toEqual(['context-alert', 'handoff-compact'])
   const keys = [...w.store.keys()]
   expect(keys.includes('session:old')).toBe(false)
   expect(keys.includes('session:fresh')).toBe(true)
@@ -690,11 +567,6 @@ test('/context-alert set is picked up by the next alert (config cache refreshed)
   expect(w.asks.length).toBe(1)
 })
 
-// A main-thread turn, as the engine reports it, for the handoff turn.
-const turnEndAs = ($: Dollar, reason: 'answer' | 'aborted' | 'error') =>
-  $.turn.complete({ answer: 'done', durationMs: 1, isAborted: reason === 'aborted', reason, turnId: 'tm' } as never)
-const writeMd = ($: Dollar, file_path: string) =>
-  $.tool.call({ tool: 'Write', file_path, content: '# handoff' } as never)
 
 test('Handoff only: the handoff runs and nothing compacts after its turn', async ($, on) => {
   const w = world($, on, { answer: 'Handoff only' })
@@ -719,7 +591,7 @@ test('Handoff, then compact: compacts once the handoff turn wrote a .md and ende
   await turnEndAs($, 'answer')
   await settle(w)
   expect(w.runs.filter((r) => r.command === 'compact').length).toBe(1)
-  expect(w.toasts).toContain('Handoff doc written. Compacting.')
+  expect(w.toasts).toContain('Handoff written, compacting.')
 })
 
 test('Handoff, then compact: waits across a turn with no write, then compacts', async ($, on) => {
@@ -874,7 +746,7 @@ test('main only: sub-agent writes and turns do not drive "Handoff, then compact"
   await $.tool.call({ tool: 'Write', file_path: '/p/handoff/sub.md', content: 'x', agentId: SUB } as never)
   for (let i = 0; i < 4; i++) { await turnEnd($, SUB); await settle(w) } // would hit the three-turn give-up if counted
   expect(w.runs.some((r) => r.command === 'compact')).toBe(false)
-  expect(w.toasts.some((t) => t.includes('Handoff doc written') || t.includes('No handoff doc'))).toBe(false)
+  expect(w.toasts.some((t) => t.includes('Handoff written, compacting.') || t.includes('No handoff doc'))).toBe(false)
   await turnEnd($) // main wrote nothing yet: still waiting, one turn counted
   await settle(w)
   expect(w.runs.some((r) => r.command === 'compact')).toBe(false)
