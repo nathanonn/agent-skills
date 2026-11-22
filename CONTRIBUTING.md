@@ -25,7 +25,7 @@ A plugin that ships `hooks/` rather than `skills/` is Claude-Code-only and has n
 so `sync-skills.sh` skips it by design — it globs `plugins/*/skills/*`. A hooks plugin missing
 from `skills/` is correct, not a sync failure. The one exception is `context-alert`, which bundles
 a copy of the `handoff-doc` skill; that copy mirrors to the same `skills/handoff-doc/` as the
-standalone plugin, so the two copies must stay byte-identical. `sync-skills.sh` enforces this: when two plugins ship a same-named skill whose bytes differ, both `--check` and the regenerate run fail with an error instead of letting the last copy win.
+standalone plugin, so the two copies must stay byte-identical. `sync-skills.sh` enforces this: when two plugins ship a same-named skill whose bytes differ, both `--check` and the regenerate run fail with an error instead of letting the last copy win. Run-time folders (`.runtime/`, `__pycache__/`) are never mirrored or compared.
 
 ## Editing a skill
 

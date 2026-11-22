@@ -52,7 +52,7 @@ def main():
             finally:
                 lock.rmdir()
         # Run as a child for Windows compatibility; preserve the worker exit status.
-        return subprocess.call([str(python), str(root / 'pd_cli.py'), *sys.argv[1:]])
+        return subprocess.call([str(python), '-B', str(root / 'pd_cli.py'), *sys.argv[1:]])
     except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
         print(f'pixel-diff setup error: {exc}\n'
               'Install Python 3.11-3.13 with venv/pip support. On Debian, install python3-venv.\n'

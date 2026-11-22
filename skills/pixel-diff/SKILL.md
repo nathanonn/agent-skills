@@ -17,7 +17,7 @@ Resolve `scripts/pixel_diff.py` relative to this skill's location. With Python 3
 python3 /path/to/pixel-diff/scripts/pixel_diff.py reference.png candidate.png --output ./pixel-diff-runs
 ```
 
-On Windows, use `py -3.11` instead of `python3`. The launcher installs pinned packages into its own environment on first use, subject to the environment's permissions. Later runs reuse them offline. For setup failures, read [runtime and setup](references/runtime.md).
+On Windows, use `py -3.11` instead of `python3`. The launcher installs pinned packages into its own environment on first use, subject to the environment's permissions. Later runs reuse them offline. If the skill folder is not writable (read-only or sandboxed installs), set `PIXEL_DIFF_ENV_ROOT` to a writable directory before the first run and keep it set for later runs. For setup failures, read [runtime and setup](references/runtime.md).
 
 The inputs must be equal-size PNG, JPEG, or still WebP, with 8-bit sRGB pixels and orientation already applied. Untagged images are assumed sRGB and reported as such. On dimension, color, orientation, or format errors, report the reason and the needed caller preparation. The command preserves original coordinates and does not resize or align inputs.
 

@@ -13,6 +13,8 @@
 # Two plugins shipping a same-named skill must keep byte-identical copies;
 # both modes fail if they differ.
 #
+# Run-time folders (.runtime/, __pycache__/, *.pyc) are never mirrored or compared.
+#
 # Usage:
 #   ./sync-skills.sh           # regenerate skills/ from plugins/
 #   ./sync-skills.sh --check   # verify skills/ is in sync (non-zero exit if not)
@@ -24,6 +26,14 @@ cd "$(dirname "$0")"
 SRC_GLOB="plugins/*/skills/*"
 DEST="skills"
 CHECK_MODE=0
+# Run-time artefacts of a skill that was run in place; never mirrored or compared.
+DIFF_EXCLUDES=(-x .runtime -x __pycache__ -x '*.pyc')
+
+# copy_skill SRC DEST: copy a skill folder, then prune run-time artefacts.
+copy_skill() {
+  cp -R "$1/." "$2/"
+  find "$2" \( -name .runtime -o -name __pycache__ \) -type d -prune -exec rm -rf {} + -o -name '*.pyc' -type f -exec rm -f {} +
+}
 
 if [[ "${1:-}" == "--check" ]]; then
   CHECK_MODE=1
@@ -47,9 +57,9 @@ conflict=0
 for ((i = 0; i < ${#sources[@]}; i++)); do
   for ((j = i + 1; j < ${#sources[@]}; j++)); do
     if [[ "$(basename "${sources[i]}")" == "$(basename "${sources[j]}")" ]]; then
-      if ! diff -rq "${sources[i]}" "${sources[j]}" >/dev/null 2>&1; then
+      if ! diff -rq "${DIFF_EXCLUDES[@]}" "${sources[i]}" "${sources[j]}" >/dev/null 2>&1; then
         echo "error: duplicate skill '$(basename "${sources[i]}")' differs between ${sources[i]} and ${sources[j]}" >&2
-        diff -rq "${sources[i]}" "${sources[j]}" >&2 || true
+        diff -rq "${DIFF_EXCLUDES[@]}" "${sources[i]}" "${sources[j]}" >&2 || true
         conflict=1
       fi
     fi
@@ -67,14 +77,14 @@ if [[ "$CHECK_MODE" -eq 1 ]]; then
   for src in "${sources[@]}"; do
     name="$(basename "$src")"
     mkdir -p "$tmp/$name"
-    cp -R "$src/." "$tmp/$name/"
+    copy_skill "$src" "$tmp/$name"
   done
-  if diff -r "$tmp" "$DEST" >/dev/null 2>&1; then
+  if diff -r "${DIFF_EXCLUDES[@]}" "$tmp" "$DEST" >/dev/null 2>&1; then
     echo "skills/ is in sync with plugins/ (${#sources[@]} skills)"
     exit 0
   else
     echo "skills/ is OUT OF SYNC with plugins/. Run ./sync-skills.sh" >&2
-    diff -r "$tmp" "$DEST" || true
+    diff -r "${DIFF_EXCLUDES[@]}" "$tmp" "$DEST" || true
     exit 1
   fi
 fi
@@ -85,7 +95,7 @@ mkdir -p "$DEST"
 for src in "${sources[@]}"; do
   name="$(basename "$src")"
   mkdir -p "$DEST/$name"
-  cp -R "$src/." "$DEST/$name/"
+  copy_skill "$src" "$DEST/$name"
   echo "synced: $src -> $DEST/$name"
 done
 
