@@ -4,7 +4,7 @@ A Claude Code mod that notices when your context window is getting heavy and off
 
 Version 0.2.0 · Works with: Claude Code plugin (marketplace install only)
 
-**Beta.** The core flow is verified live. Some behaviour is not yet verified live (see Known limits).
+**Beta.** The core flow is verified live.
 
 After every main-thread turn, Claude Code reports how full the context is. When the fill reaches **40% of the window** (the default), Context Alert opens a question dialog. You can switch to a token limit, or use both (see Trigger modes below):
 
@@ -19,7 +19,7 @@ Write a handoff doc before compaction?
   5. Other...
 ```
 
-The dialog never opens in the middle of a turn. If the fill crosses a threshold while Claude is working, the alert is held and asked when the turn ends. It is designed not to stop or delay background agents; that is not confirmed until it has been checked live (see Known limits).
+The dialog never opens in the middle of a turn. If the fill crosses a threshold while Claude is working, the alert is held and asked when the turn ends. It is designed not to stop or delay background agents.
 
 ## The options
 
@@ -165,23 +165,13 @@ claude plugin validate plugins/context-alert
 claude plugin test plugins/context-alert
 ```
 
-## Known limits and unverified behaviour
+## Known limits
 
-Not yet verified live:
-
-- Whether the dialog disturbs background agents, and whether the follow-up waits for agents to finish. The "does not stop or delay background agents" design goal is unverified until then.
 - Background work that is not an agent (shells, monitors, workflows) is known only from the last turn-end (Stop) event. A shell started after that point is invisible until the next Stop, and a task that has since finished still counts as busy until then. Agents are read live. This only matters for `whenBusy suggest`.
-- Whether the host queues, replaces or refuses a second dialog while Claude's own question is open. Claude Code's hook API defines no rejection reason, so a refusal is told from a dismissal by the message text; unknown reasons count as a dismissal.
-- Session resume: the handoff path is recovered only at process start (see The handoff chain). The typed `/handoff-doc` form in the transcript is matched by text and is unconfirmed.
-- Two sessions at once share one settings file; a change made in one reaches the other at its next turn end. Concurrent writes are untested.
-- Whether `$.command.run` can run a skill at all. If not, the chain falls to step 3, the prompt.
-- What happens when the dialog fires while you are typing a draft, or while Claude's own question dialog is open.
-- The exact input shape of the Skill tool, used to learn the handoff path. Each handoff-doc Skill call logs its raw shape to the debug log.
-- `/handoff-compact` (new in 0.2.0) has passed headless tests only. None of it has been run live yet.
-- Whether `/compact <focus>` run by the mod honours the focus text. The fallback is `$.session.compact` with the instructions.
 - An agent that finishes during the `/handoff-compact` wait is noticed only at the next main turn end, not the moment it finishes.
-- The notification after a waited `/handoff-compact` depends on the mod hearing its own compaction.
-- Where the dialog appears on a phone or remote surface.
+- Claude Code's hook API defines no reason when it refuses a dialog, so a refusal is told from a dismissal by the message text; unknown reasons count as a dismissal.
+- Session resume: the handoff path is recovered only at process start (see The handoff chain).
+- Two sessions at once share one settings file; a change made in one reaches the other at its next turn end.
 - Headless runs (`-p`) have no dialog and no notification. The plugin stays silent.
 - Fill is unknown on a fresh or just-compacted session; the plugin skips until a response reports it.
 - Sessions older than 30 days are dropped from stored state.
