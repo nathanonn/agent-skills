@@ -1,6 +1,6 @@
 # Agent Skills
 
-14 skills and 2 Claude Code plugins for autonomous development workflows: planning, orchestration, Codex `/goal` bundles, WordPress, design systems and handoffs. The skills install into Claude Code, Codex, Cursor, GitHub Copilot and other agents; the plugins need Claude Code.
+15 skills and 2 Claude Code plugins for autonomous development workflows: planning, orchestration, Codex `/goal` bundles, WordPress, design systems and handoffs. The skills install into Claude Code, Codex, Cursor, GitHub Copilot and other agents; the plugins need Claude Code.
 
 By [Nathan Onn](https://www.nathanonn.com)
 
@@ -46,6 +46,7 @@ Pick a skill, then [install](#install) it. Each name links to its page with exam
 | [extract-design-md](plugins/extract-design-md/README.md) | Extract a website's design system into a DESIGN.md file (google-labs-code format): colors, typography, spacing, components and brand feel, checked by the official linter. | "make a DESIGN.md from &lt;site&gt;" | Any agent |
 | [extract-design-system](plugins/extract-design-system/README.md) | Extract a website's tokens and component catalog (variants, states, section patterns) into a bundle a coding agent uses to build pages native to that brand. | "clone the design system of &lt;site&gt;", "make new pages that look like &lt;site&gt;" | Any agent |
 | [design-system-to-skill](plugins/design-system-to-skill/README.md) | Convert an extract-design-system output bundle into a self-contained, auto-triggering per-brand Claude Code skill that later agents use to build pages native to that brand. | "turn this design system into a skill" | Claude Code |
+| [pixel-diff](plugins/pixel-diff/README.md) | Compare two screenshots or images pixel by pixel: highlight changed pixels, count and locate differences, and check optional acceptance limits. | "compare these two screenshots", "pixel diff the prototype against the build" | Any agent |
 
 ### Media
 | Skill | What it does | Say | Works with |
@@ -91,6 +92,7 @@ Per-agent flags, global installs, manual copy, hooks setup and updating: [docs/i
 | Codex CLI | codex-imagegen | `npm i -g @openai/codex`, then `codex login` (see [its page](plugins/codex-imagegen/README.md)) |
 | Node.js 20.10+ | validate-block-markup (first run downloads ~545 MB into the skill folder) | |
 | Node.js 18+ | design-system-to-skill | |
+| Python 3.11-3.13 with `venv` and `pip` | pixel-diff (first run installs Pillow and NumPy into its own environment, which needs network access once) | |
 | `curl`, `jq` 1.6+, an admin Application Password | wp-rest-api | |
 | Claude Code with hooks support | wp-credential-guard, context-alert | |
 

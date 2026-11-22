@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "pixel-diff",
+  "displayName": "Pixel Diff",
+  "version": "1.0.0",
+  "description": "Compare two screenshots or images pixel by pixel: highlight changed pixels, count and locate differences, and check optional acceptance limits.",
+  "author": {
+    "name": "Nathan Onn",
+    "url": "https://github.com/nathanonn"
+  },
+  "repository": "https://github.com/nathanonn/agent-skills",
+  "license": "MIT",
+  "keywords": ["pixel-diff", "screenshot", "visual-regression", "image-comparison", "verification", "design"]
+}

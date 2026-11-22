@@ -22,6 +22,7 @@ Add the marketplace once, then install the plugins you want.
 /plugin install extract-design-md@nathanonn-agent-skills
 /plugin install extract-design-system@nathanonn-agent-skills
 /plugin install design-system-to-skill@nathanonn-agent-skills
+/plugin install pixel-diff@nathanonn-agent-skills
 /plugin install codex-imagegen@nathanonn-agent-skills
 /plugin install wp-credential-guard@nathanonn-agent-skills
 /plugin install context-alert@nathanonn-agent-skills

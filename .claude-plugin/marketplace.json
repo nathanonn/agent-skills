@@ -178,6 +178,19 @@
       "category": "design"
     },
     {
+      "name": "pixel-diff",
+      "displayName": "Pixel Diff",
+      "source": "./plugins/pixel-diff",
+      "description": "Compare two screenshots or images pixel by pixel: highlight changed pixels, count and locate differences, and check optional acceptance limits.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Onn"
+      },
+      "license": "MIT",
+      "keywords": ["pixel-diff", "screenshot", "visual-regression", "image-comparison", "verification", "design"],
+      "category": "design"
+    },
+    {
       "name": "codex-imagegen",
       "displayName": "Codex Imagegen",
       "source": "./plugins/codex-imagegen",

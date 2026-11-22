@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pixel diff"
+  short_description: "Compare two images and highlight changed pixels"
+  default_prompt: "Use $pixel-diff to compare these two images and explain the highlighted differences."
