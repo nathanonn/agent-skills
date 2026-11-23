@@ -39,7 +39,7 @@
       "displayName": "Handoff Doc",
       "source": "./plugins/handoff-doc",
       "description": "Write or update a session handoff doc so a future session (Claude or human) can resume work without re-reading the whole transcript.",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "author": {
         "name": "Nathan Onn"
       },
@@ -221,7 +221,7 @@
       "displayName": "Context Alert",
       "source": "./plugins/context-alert",
       "description": "Opens a question dialog when the context window passes a threshold (40% by default), offers a handoff doc, and adds /handoff-compact.",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "author": {
         "name": "Nathan Onn"
       },

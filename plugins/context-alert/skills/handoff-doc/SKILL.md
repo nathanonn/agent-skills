@@ -24,23 +24,39 @@ Look at the path the user gave and the folder it lives in.
   `YYYYMMDD_NN_short-slug.md` convention (date, then a two-digit sequence). If
   the siblings follow a pattern, match it — continue the numbering and use
   today's date.
-- **Sanity-check the filename against today's date.** If the date in the
-  filename looks wrong (e.g. a year or month that doesn't match today, or it's
-  out of order with its siblings), it's probably a typo. Surface it with
-  `AskUserQuestion` and offer the corrected name — never silently rename.
+- **Only when the target doesn't exist yet,** sanity-check the filename against
+  today's date. An existing doc's date is never a typo; step 2 decides what to
+  do with it. If the new filename's date looks wrong (e.g. a year or month that
+  doesn't match today, or it's out of order with its siblings), it's probably a
+  typo. Surface it with `AskUserQuestion` and offer the corrected name — never
+  silently rename.
 
 ### 2. Decide create vs. update
 
 - If the target **doesn't exist** (or is an empty placeholder), create it.
-- If the target **already exists with content**, don't assume. Use
-  `AskUserQuestion` to ask how to proceed, with these options:
-  - **Overwrite** in place (replace the contents).
-  - **Append** a new dated section to the same file.
-  - **Sequel** — write a new file at the next `_NN_` in the series, referencing
-    the prior one.
+- If the target **already exists with content**, decide without asking:
+  1. **It already covers this session's work.** Claude wrote it earlier in this
+     same session (including before a context compaction) and the session is
+     still on that same piece of work. A conversation resumed on a later day
+     counts as an earlier session. Update it in place: revise the sections
+     and add what's new, keeping what's still true. A short dated "Update"
+     section at the end is fine when that reads better.
+  2. **It's from an earlier session, or covers earlier work this session has
+     since moved past, and the folder uses a `YYYYMMDD_NN_slug.md` series.**
+     Write a sequel at the next `_NN_` with today's date and link back to the
+     prior doc. Never rewrite an earlier session's doc in this case.
+  3. **It's a single fixed file with no series** (e.g. `HANDOFF.md`) from an
+     earlier session, or covers earlier work this session has since moved past.
+     Append a new dated section. Don't wipe the old content.
+  4. **None of these settles it.** For example, the target doesn't look like a
+     handoff doc, the user's own words point a different way, or it's unclear
+     whether the doc is this session's work. Ask with `AskUserQuestion`, with
+     options **Overwrite**, **Append** and **Sequel**.
 
-  This is a genuine fork with no safe default — losing a handoff someone wanted
-  kept is worse than asking one question.
+  If the user explicitly says overwrite, append or sequel, do that. A plain
+  "update the handoff" does not override rules 1–3.
+  Always name the choice in the final report (e.g. "Wrote a sequel at … (prior
+  doc from an earlier session)") so the user can redirect.
 
 ### 3. Distill the session into the doc
 
@@ -96,8 +112,9 @@ This skill leans autonomous — the user's whole ask is "give a path, get a doc,
 so don't interrogate them. Reserve `AskUserQuestion` for the cases where a wrong
 guess is costly:
 
-- An existing file at the target (overwrite / append / sequel — always ask).
-- A filename whose date or sequence looks like a typo (offer the fix).
+- An existing file at the target that the rules in step 2 don't settle
+  (overwrite / append / sequel). Otherwise decide and say which you chose.
+- A new filename whose date or sequence looks like a typo (offer the fix).
 - Genuinely ambiguous audience or scope that the conversation doesn't settle.
 
 Everything else — section choices, what to include, phrasing — is yours to

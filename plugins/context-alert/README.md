@@ -2,7 +2,7 @@
 
 A Claude Code mod that notices when your context window is getting heavy and offers to write a handoff doc before compaction.
 
-Version 0.2.1 · Works with: Claude Code plugin (marketplace install only)
+Version 0.2.2 · Works with: Claude Code plugin (marketplace install only)
 
 **Beta.** The core flow is verified live.
 
@@ -61,7 +61,7 @@ What "Write handoff doc" does depends on whether a handoff path is already known
 
 1. The project's own `handoff-doc` skill, with that path.
 2. The bundled `context-alert:handoff-doc` skill that ships with this plugin, with that path.
-3. A prompt asking Claude to update the handoff at that path.
+3. A prompt asking Claude to write this session's handoff using that path (the existing doc there or the next one in its series).
 
 **No path known** ("Write handoff doc"). The plugin sends a prompt that names both skills, `handoff-doc` (the project's, if it has one) and `context-alert:handoff-doc` (the bundled one). Claude picks the skill, asks you for the destination with a question dialog, and recommends one based on the project's handoff folder and naming pattern if it has one.
 

@@ -8,7 +8,7 @@ Version 1.0.0 · Works with: Any agent · [SKILL.md](skills/handoff-doc/SKILL.md
 
 **Write a session handoff doc so the next session can pick up cold.**
 
-Distills the current session into one tight handoff doc — what was done, where things live, what's verified, and what's still open — so a future session (Claude or human) can resume without re-reading the whole transcript. You give the destination path; the skill supplies the content. It matches the destination folder's existing filename convention, asks before overwriting an existing handoff (overwrite / append / sequel), flags filename-date typos, and stays honest about what was *not* verified.
+Distills the current session into one tight handoff doc — what was done, where things live, what's verified, and what's still open — so a future session (Claude or human) can resume without re-reading the whole transcript. You give the destination path; the skill supplies the content. It matches the destination folder's existing filename convention, decides itself whether to update in place, write a sequel or append (asking only when the session and folder do not settle it), flags filename-date typos, and stays honest about what was *not* verified.
 
 This skill is also bundled inside the [context-alert](../context-alert/README.md) plugin.
 

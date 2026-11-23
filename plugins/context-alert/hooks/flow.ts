@@ -57,8 +57,8 @@ function noPathPrompt(source: Flow['source']): string {
 }
 
 function withPathPrompt(path: string, source: Flow['source']): string {
-  const lead = source === 'dialog' ? 'Context is getting heavy, so please update' : 'Please update'
-  return `${lead} the handoff doc at ${path} now, using ${SKILLS}.`
+  const lead = source === 'dialog' ? 'Context is getting heavy, so please write' : 'Please write'
+  return `${lead} the handoff doc for this session, using ${path} (the existing doc there or the next one in its series), with ${SKILLS}.`
 }
 
 /** project skill, then the bundled copy, then a plain prompt worded for `source`. Never throws. */
