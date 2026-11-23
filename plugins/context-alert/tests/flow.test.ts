@@ -1,7 +1,7 @@
 // Headless tests for the /handoff-compact flow (proposal 05/06), driven through the real hooks module.
 import { test, expect } from 'claude-code/testing'
 import {
-  alreadyRunningToast, CANCELLED_TOAST, focusInstructions, HANDOFF_COMPACTING_TOAST, NO_DOC_WRITTEN_TOAST, NOW_UPGRADE_TOAST,
+  alreadyRunningToast, CANCELLED_TOAST, continuePrompt, focusInstructions, HANDOFF_COMPACTING_TOAST, NO_DOC_WRITTEN_TOAST, NOW_UPGRADE_TOAST,
   ALREADY_COMPACTING_TOAST, pathIgnored, TURN_NOT_FINISHED_TOAST, WAITED_NOTIFICATION, waitToast,
 } from '../hooks/flow-logic'
 import { measure, NOW, settle, turnEnd, turnEndAs, turnStart, typed, world, writeMd, type Dollar, type World } from './world'
@@ -723,4 +723,367 @@ test('prompt wording: the command\'s handoff prompt is neutral (the dialog\'s is
   await settle(a)
   expect(a.submits[0]!.text.startsWith('I want a handoff doc now.')).toBe(true)
   expect(a.submits[0]!.text).toContain('`context-alert:handoff-doc`')
+})
+
+// ---- the continue nudge: after a handoff flow's compaction, with no agent running ----
+
+const nudges = (w: World) => w.submits.filter((s) => s.text.startsWith('Continue the work in progress'))
+const autoCompaction = ($: Dollar) =>
+  $.session.compact({ trigger: 'auto', messages: [{ role: 'user', text: 'hi', toolUses: [] }] } as never)
+const nudgeLogged = (w: World, what: string) => w.logs.some((l) => l.includes('no continue nudge') && l.includes(what))
+
+test('nudge: a command flow with no agents sends one continue prompt once the compaction lands, not before', async ($, on) => {
+  const w = world($, on, { store: known })
+  await hc($)
+  await settle(w)
+  await handoffTurn($, w)
+  expect(compacts(w).length).toBe(1)
+  expect(nudges(w).length).toBe(0) // queued, not landed
+  await compactLands($, focusInstructions(DOC))
+  await settle(w)
+  expect(nudges(w)).toEqual([{ text: continuePrompt(DOC), asUser: true }])
+  expect(w.logs.some((l) => l.includes('continue nudge sent'))).toBe(true)
+})
+
+test('nudge: the dialog\'s "Handoff, then compact" nudges too', async ($, on) => {
+  const w = world($, on, { answer: 'Update handoff, then compact', store: known })
+  await measure($, 41, 410_000)
+  await settle(w)
+  await handoffTurn($, w)
+  await compactLands($, focusInstructions(DOC))
+  await settle(w)
+  expect(nudges(w).map((n) => n.text)).toEqual([continuePrompt(DOC)])
+})
+
+test('nudge: the path is the one the flow wrote, not the stored one', async ($, on) => {
+  const w = world($, on)
+  await hc($)
+  await settle(w)
+  await handoffTurn($, w, '/p/handoff/new.md')
+  await compactLands($, focusInstructions('/p/handoff/new.md'))
+  await settle(w)
+  expect(nudges(w).map((n) => n.text)).toEqual([continuePrompt('/p/handoff/new.md')])
+})
+
+test('nudge: after waiting for agents that finished, it comes after the notification', async ($, on) => {
+  const w = world($, on, { store: known, agents: [{ id: 'x', status: 'running' }] })
+  await hc($)
+  await settle(w)
+  await handoffTurn($, w)
+  w.agents[0]!.status = 'completed'
+  await plainTurn($, w)
+  await plainTurn($, w)
+  await compactLands($)
+  await settle(w)
+  expect(w.notifies.length).toBe(1)
+  expect(w.order.filter((o) => o === 'notify' || o.startsWith('submit: Continue'))).toEqual(['notify', `submit: ${continuePrompt(DOC)}`])
+})
+
+test('nudge: none with an agent still running (now): its report wakes the session', async ($, on) => {
+  const w = world($, on, { store: known, agents: [{ id: 'x', status: 'running' }] })
+  await hc($, 'now')
+  await settle(w)
+  await handoffTurn($, w)
+  expect(compacts(w).length).toBe(1)
+  await compactLands($)
+  await settle(w)
+  expect(nudges(w).length).toBe(0)
+  expect(nudgeLogged(w, 'still running')).toBe(true)
+})
+
+test('nudge: a nested agent, a teammate and background shells do not block it', async ($, on) => {
+  const w = world($, on, {
+    store: known,
+    agents: [{ id: 'n', status: 'running', parentId: 'x' }, { id: 't', status: 'running', kind: 'in_process_teammate' }],
+  })
+  await hc($)
+  await settle(w)
+  await handoffTurn($, w)
+  await compactLands($)
+  await settle(w)
+  expect(nudges(w).length).toBe(1)
+})
+
+test('nudge: none when agent.list fails at landing', async ($, on) => {
+  const w = world($, on, { store: known })
+  w.agentListFails = true
+  await hc($, 'now') // now: the unreadable list does not hold the compaction back
+  await settle(w)
+  await handoffTurn($, w)
+  expect(compacts(w).length).toBe(1)
+  await compactLands($)
+  await settle(w)
+  expect(nudges(w).length).toBe(0)
+  expect(nudgeLogged(w, 'agent.list failed')).toBe(true)
+})
+
+test('nudge: none for the dialog\'s plain "Compact now", a typed /compact or an auto-compaction', async ($, on) => {
+  const a = world($, on, { answer: 'Compact now', refuse: ['compact'] }) // the fallback path
+  await measure($, 41, 410_000)
+  await settle(a)
+  expect(a.compacts).toBe(1)
+  await compactLands($) // a typed /compact
+  await autoCompaction($)
+  await settle(a)
+  expect(nudges(a).length).toBe(0)
+})
+
+test('nudge: none for "Compact now" via the command, a typed /compact and an auto-compaction', async ($, on) => {
+  const w = world($, on, { answer: 'Compact now' })
+  await measure($, 41, 410_000)
+  await settle(w)
+  expect(compacts(w).length).toBe(1)
+  await compactLands($)
+  await compactLands($)
+  await autoCompaction($)
+  await settle(w)
+  expect(nudges(w).length).toBe(0)
+})
+
+test('nudge: continue off (set through the command) sends none', async ($, on) => {
+  const w = world($, on, { store: known })
+  const r = await typed($, 'context-alert', 'set continue off')
+  expect(r.text).toContain('continue = false')
+  expect((w.store.get('config') as { continue: boolean }).continue).toBe(false)
+  await hc($)
+  await settle(w)
+  await handoffTurn($, w)
+  await compactLands($)
+  await settle(w)
+  expect(nudges(w).length).toBe(0)
+  expect(nudgeLogged(w, 'continue is off')).toBe(true)
+  const back = await typed($, 'context-alert', 'set continue on')
+  expect(back.text).toContain('continue = true')
+})
+
+test('nudge: an old config without the key reads as on; status shows the setting', async ($, on) => {
+  const w = world($, on, { store: { ...known, config: { enabled: true, notify: true, percent: 40 } } })
+  const r = await typed($, 'context-alert', 'status')
+  expect(r.text).toContain('continue true')
+  await hc($)
+  await settle(w)
+  await handoffTurn($, w)
+  await compactLands($)
+  await settle(w)
+  expect(nudges(w).length).toBe(1)
+})
+
+test('nudge: the session.compact fallback (the mod\'s own call) nudges exactly once', async ($, on) => {
+  const w = world($, on, { store: known, refuse: ['compact'] })
+  await hc($)
+  await settle(w)
+  await handoffTurn($, w)
+  expect(w.compacts).toBe(1)
+  expect(nudges(w).map((n) => n.text)).toEqual([continuePrompt(DOC)])
+})
+
+test('nudge: exactly one per compaction, however many times the landing is reported', async ($, on) => {
+  const w = world($, on, { store: known })
+  await hc($)
+  await settle(w)
+  await handoffTurn($, w)
+  await compactLands($)
+  await compactLands($)
+  await autoCompaction($)
+  await settle(w)
+  expect(nudges(w).length).toBe(1)
+})
+
+test('nudge: a vetoed compaction leaves no intent for a later compaction', async ($, on) => {
+  const w = world($, on, { store: known })
+  await hc($)
+  await settle(w)
+  await handoffTurn($, w)
+  w.compactVeto = true
+  await compactLands($) // another plugin vetoes it
+  await settle(w)
+  w.compactVeto = false
+  await autoCompaction($)
+  await settle(w)
+  expect(nudges(w).length).toBe(0)
+})
+
+test('nudge: a compaction that could not start (fallback vetoed) leaves no intent', async ($, on) => {
+  const w = world($, on, { store: known, refuse: ['compact'], compactRejects: true })
+  await hc($)
+  await settle(w)
+  await handoffTurn($, w)
+  expect(w.toasts).toContain("Compaction couldn't start; run /compact")
+  w.compactVeto = false
+  await autoCompaction($)
+  await settle(w)
+  expect(nudges(w).length).toBe(0)
+})
+
+test('nudge: a compaction that never lands (a main turn starts first) leaves no intent', async ($, on) => {
+  const w = world($, on, { store: known })
+  await hc($)
+  await settle(w)
+  await handoffTurn($, w)
+  await plainTurn($, w) // the queued /compact was dropped; the session moved on
+  await autoCompaction($)
+  await settle(w)
+  expect(nudges(w).length).toBe(0)
+})
+
+test('nudge: /clear drops the intent', async ($, on) => {
+  const w = world($, on, { store: known })
+  await hc($)
+  await settle(w)
+  await handoffTurn($, w)
+  await clear($)
+  await autoCompaction($)
+  await settle(w)
+  expect(nudges(w).length).toBe(0)
+})
+
+test('nudge: a headless run sends none', async ($, on) => {
+  const w = world($, on, { store: known })
+  await $.session.start({ cwd: '/', surface: null, isInteractive: false })
+  await settle(w)
+  await hc($)
+  await settle(w)
+  await handoffTurn($, w)
+  await compactLands($)
+  await settle(w)
+  expect(nudges(w).length).toBe(0)
+})
+
+test('nudge: it starts no flow and opens no alert dialog afterwards', async ($, on) => {
+  const w = world($, on, { answer: 'Update handoff, then compact', store: known })
+  await measure($, 41, 410_000)
+  await settle(w)
+  await handoffTurn($, w)
+  await compactLands($, focusInstructions(DOC))
+  await settle(w)
+  expect(nudges(w).length).toBe(1)
+  await plainTurn($, w) // the nudge's own turn
+  await measure($, 5, 50_000) // the fill after compaction
+  await settle(w)
+  expect(w.asks.length).toBe(1) // only the first dialog
+  expect(w.runs).toEqual([{ command: 'handoff-doc', args: DOC }, { command: 'compact', args: focusInstructions(DOC) }])
+  expect(nudges(w).length).toBe(1)
+})
+
+test('nudge: a dropped nudge prompt is logged, not retried', async ($, on) => {
+  const w = world($, on, { store: known, dropPrompt: (t) => t.startsWith('Continue the work') })
+  await hc($)
+  await settle(w)
+  await handoffTurn($, w)
+  await compactLands($)
+  await settle(w)
+  expect(w.logs.some((l) => l.includes('continue nudge dropped'))).toBe(true)
+})
+
+// ---- review round: stale nudges (S1) and a stale intent (S2) ----
+
+test('nudge S1: a main turn that started while the landing was being handled cancels it', async ($, on) => {
+  const w = world($, on, { store: known })
+  await hc($)
+  await settle(w)
+  await handoffTurn($, w)
+  w.listDelayMs = 50 // the landing's agent check stays open while the next event arrives
+  await compactLands($, focusInstructions(DOC))
+  await turnStart($) // the person's queued message begins before the nudge is submitted
+  await turnEnd($)
+  await w.clock.advance(50)
+  await settle(w)
+  expect(nudges(w).length).toBe(0)
+  expect(w.logs.some((l) => l.includes('a new turn started'))).toBe(true)
+})
+
+test('nudge S1: a turn still running at submit time cancels it', async ($, on) => {
+  const w = world($, on, { store: known })
+  await hc($)
+  await settle(w)
+  await handoffTurn($, w)
+  w.listDelayMs = 50 // the landing's agent check stays open while the next event arrives
+  await compactLands($, focusInstructions(DOC))
+  await turnStart($)
+  await w.clock.advance(50)
+  await settle(w)
+  expect(nudges(w).length).toBe(0)
+  expect(w.logs.some((l) => l.includes('a new turn started'))).toBe(true)
+})
+
+test('nudge S1: /clear while the landing is being handled cancels it', async ($, on) => {
+  const w = world($, on, { store: known })
+  await hc($)
+  await settle(w)
+  await handoffTurn($, w)
+  w.listDelayMs = 50 // the landing's agent check stays open while the next event arrives
+  await compactLands($, focusInstructions(DOC))
+  await clear($)
+  await w.clock.advance(50)
+  await settle(w)
+  expect(nudges(w).length).toBe(0)
+  expect(w.logs.some((l) => l.includes('a new turn started or the conversation was cleared'))).toBe(true)
+})
+
+test('nudge S2: a stale intent does not ride an auto-compaction, with or without instructions', async ($, on) => {
+  const w = world($, on, { store: known })
+  await hc($)
+  await settle(w)
+  await handoffTurn($, w) // the flow's /compact is queued, then silently lost
+  await autoCompaction($)
+  await settle(w)
+  expect(nudges(w).length).toBe(0)
+  expect(w.logs.some((l) => l.includes('no continue nudge: instructions missing, trigger auto'))).toBe(true)
+})
+
+test('nudge S2: a stale intent does not ride a typed /compact with the person\'s own instructions', async ($, on) => {
+  const w = world($, on, { store: known })
+  await hc($)
+  await settle(w)
+  await handoffTurn($, w)
+  await compactLands($, 'focus on the tests')
+  await settle(w)
+  expect(nudges(w).length).toBe(0)
+  expect(w.logs.some((l) => l.includes('instructions differ'))).toBe(true)
+})
+
+test('nudge S2: instructions absent with a manual trigger still nudges, and the log says so', async ($, on) => {
+  const w = world($, on, { store: known })
+  await hc($)
+  await settle(w)
+  await handoffTurn($, w)
+  await compactLands($) // trigger manual, no instructions
+  await settle(w)
+  expect(nudges(w).length).toBe(1)
+  expect(w.logs.some((l) => l.includes('continue nudge: instructions missing, trigger manual'))).toBe(true)
+})
+
+test('reset session clears a pending nudge, the notification flag and the queued-compaction guard', async ($, on) => {
+  const w = world($, on, { store: known })
+  await hc($)
+  await settle(w)
+  await handoffTurn($, w)
+  await typed($, 'context-alert', 'reset session')
+  await compactLands($, focusInstructions(DOC))
+  await settle(w)
+  expect(nudges(w).length).toBe(0)
+})
+
+test('on/off/true/false are case-insensitive for boolean keys', async ($, on) => {
+  const w = world($, on)
+  await typed($, 'context-alert', 'set continue OFF')
+  expect((w.store.get('config') as { continue: boolean }).continue).toBe(false)
+  await typed($, 'context-alert', 'set notify False')
+  expect((w.store.get('config') as { notify: boolean }).notify).toBe(false)
+  await typed($, 'context-alert', 'set continue On')
+  expect((w.store.get('config') as { continue: boolean }).continue).toBe(true)
+})
+
+test('nudge S1 control: a slow agent check with nothing in between still sends the nudge', async ($, on) => {
+  const w = world($, on, { store: known })
+  await hc($)
+  await settle(w)
+  await handoffTurn($, w)
+  w.listDelayMs = 50
+  await compactLands($, focusInstructions(DOC))
+  await settle(w)
+  expect(nudges(w).length).toBe(0) // still waiting on the agent list
+  await w.clock.advance(50)
+  await settle(w)
+  expect(nudges(w).length).toBe(1)
 })

@@ -13,6 +13,8 @@ export type Config = {
   notify: boolean
   whenBusy: 'dialog' | 'suggest'
   midTurnToast: boolean
+  /** After a handoff-compact flow's compaction, nudge the session to carry on when no agent is still running. */
+  continue: boolean
 }
 
 export const DEFAULTS: Config = {
@@ -25,6 +27,7 @@ export const DEFAULTS: Config = {
   notify: true,
   whenBusy: 'dialog',
   midTurnToast: true,
+  continue: true,
 }
 
 export type Asked = { pct: number; tokens: number; at: number }
@@ -42,7 +45,7 @@ export type SetResult =
   | { ok: true; key: keyof Config; value: Config[keyof Config] }
   | { ok: false; error: string }
 
-const BOOL_KEYS = ['enabled', 'notify', 'midTurnToast'] as const
+const BOOL_KEYS = ['enabled', 'notify', 'midTurnToast', 'continue'] as const
 const NUM_KEYS = ['percent', 'tokens', 'stepPercent', 'stepTokens'] as const
 
 export function mergeConfig(stored: unknown): Config {
@@ -63,10 +66,10 @@ export function mergeConfig(stored: unknown): Config {
 export function parseSet(key: string, raw: string): SetResult {
   const value = raw.trim()
   if ((BOOL_KEYS as readonly string[]).includes(key)) {
-    if (value === 'true' || value === 'false') {
-      return { ok: true, key: key as keyof Config, value: value === 'true' }
-    }
-    return { ok: false, error: `${key} takes true or false, got "${value}"` }
+    const v = value.toLowerCase()
+    if (v === 'true' || v === 'on') return { ok: true, key: key as keyof Config, value: true }
+    if (v === 'false' || v === 'off') return { ok: true, key: key as keyof Config, value: false }
+    return { ok: false, error: `${key} takes on or off (true or false), got "${value}"` }
   }
   if ((NUM_KEYS as readonly string[]).includes(key)) {
     if (!/^\d+(\.\d+)?$/.test(value)) return { ok: false, error: `${key} takes a positive number, got "${value}"` }

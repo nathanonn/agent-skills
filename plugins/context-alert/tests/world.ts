@@ -24,6 +24,10 @@ export type World = {
   agents: { id: string; status: string; description?: string; parentId?: string; kind?: string; teammateId?: string }[]
   /** $.agent.list() rejects while true; tests may flip it. */
   agentListFails: boolean
+  /** Notifications and submitted prompts in the order the engine saw them ("notify" / "submit: <text>"). */
+  order: string[]
+  /** Hold $.agent.list()'s answer on the mocked clock for this long (set mid-test to let events land mid-await). */
+  listDelayMs: number
   /** session.compact comes back vetoed while true (starts as Opts.compactRejects); tests may flip it. */
   compactVeto: boolean
   registered: string[]
@@ -60,7 +64,7 @@ export function world($: Dollar, on: On, o: Opts = {}): World {
   const w: World = {
     asks: [], toasts: [], suggests: [], notifies: [], suggestShown: true, submits: [], runs: [], logs: [], compacts: 0,
     registered: [], store: new Map(), clock: undefined as never, compactInstructions: [],
-    agents: (o.agents ?? []).map((a) => ({ ...a })), agentListFails: false,
+    agents: (o.agents ?? []).map((a) => ({ ...a })), agentListFails: false, order: [], listDelayMs: 0,
     compactVeto: o.compactRejects === true,
   }
   for (const [k, v] of Object.entries(o.store ?? {})) w.store.set(k, JSON.parse(JSON.stringify(v)))
@@ -90,13 +94,15 @@ export function world($: Dollar, on: On, o: Opts = {}): World {
   on('turn.start', (_, e) => ({ turnId: e.turnId }))
   on('turn.complete', (_, e) => ({ text: e.answer }))
   on('classic.Stop', () => ({}) as never)
-  on('agent.list', () => {
+  on('agent.list', async () => {
+    if (w.listDelayMs) await w.clock.sleep(w.listDelayMs)
     if (w.agentListFails) return { deny: 'agent list unavailable' } as never
     return { value: w.agents.map((a) => ({ kind: 'local_agent', description: '', type: 'general-purpose', ...a })) as never }
   })
   on('session.end', (_, e) => ({ sessionId: e.sessionId }))
   on('ui.notify', (_, e) => {
     w.notifies.push({ text: e.text, title: (e as { title?: string }).title })
+    w.order.push('notify')
     return { value: { isSent: false, reason: 'disabled' } }
   })
   on('ui.toast', (_, e) => { w.toasts.push(e.text); return { value: undefined } })
@@ -105,7 +111,10 @@ export function world($: Dollar, on: On, o: Opts = {}): World {
   on('prompt.suggest', (_, e) => { w.suggests.push(e.text); return { isShown: w.suggestShown } })
   on('prompt.submit', (_, e) => {
     if (o.dropPrompt?.(e.text)) return { drop: 'dropped by a test hook' } as never
-    w.submits.push({ text: e.text, asUser: (e.origin as { asUser?: boolean }).asUser }); return { text: e.text } })
+    w.submits.push({ text: e.text, asUser: (e.origin as { asUser?: boolean }).asUser })
+    w.order.push(`submit: ${e.text}`)
+    return { text: e.text }
+  })
   on('command.run', (_, e) => {
     w.runs.push({ command: e.command, args: e.args })
     if (o.refuse?.includes(e.command)) throw new Error(`unknown command ${e.command}`)

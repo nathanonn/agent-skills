@@ -117,8 +117,10 @@ export const register: Register = (on) => {
     const r = await next(e)
     if (e.agentId === undefined) {
       rt.mainTurnRunning = true
+      rt.epoch++
       rt.compacting = false // the compaction ran or was dropped; either way the session moved on
       rt.notifyOnCompact = false // so a dropped compaction's notification cannot ride a later auto-compaction
+      rt.nudgeAfterCompact = undefined // nor its continue nudge
       rt.turnOrigin = rt.nextTurnOrigin // undefined: a prompt this mod did not see (its own, or queued mid-turn)
       rt.nextTurnOrigin = undefined
     }
@@ -141,9 +143,9 @@ export const register: Register = (on) => {
     const r = await next(e)
     const skipped = (r as { skip?: string } | undefined)?.skip
     if (e.agentId === undefined && e.trigger !== 'precompute') rt.compacting = false
-    if (e.agentId === undefined && e.trigger !== 'precompute' && skipped) rt.notifyOnCompact = false
+    if (e.agentId === undefined && e.trigger !== 'precompute' && skipped) { rt.notifyOnCompact = false; rt.nudgeAfterCompact = undefined }
     if (e.agentId === undefined && e.trigger !== 'precompute' && !skipped) {
-      void afterCompaction($, rt, e.instructions).catch(quiet) // tiers reset (D15), any flow ends (D26)
+      void afterCompaction($, rt, e.instructions, e.trigger).catch(quiet) // tiers reset (D15), any flow ends (D26)
     }
     return r
   })
@@ -239,7 +241,10 @@ export const register: Register = (on) => {
       return {
         text: await handleCommand($, e.args, {
           onConfig: (cfg) => { rt.config = cfg },
-          onResetSession: () => { rt.pending = false; rt.suggestAnnounced = undefined; rt.refusals = 0; rt.flow = undefined },
+          onResetSession: () => {
+            rt.pending = false; rt.suggestAnnounced = undefined; rt.refusals = 0; rt.flow = undefined
+            rt.notifyOnCompact = false; rt.nudgeAfterCompact = undefined; rt.compacting = false; rt.epoch++
+          },
         }),
       }
     } catch (err) {

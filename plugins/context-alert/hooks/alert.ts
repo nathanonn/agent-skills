@@ -35,6 +35,13 @@ export type Runtime = {
   flow?: Flow
   /** The flow that just asked for a compaction waited for agents: session.compact sends the notification. */
   notifyOnCompact: boolean
+  /**
+   * A handoff flow asked for a compaction: once it lands, nudge the session to continue from the doc at `path`
+   * (if no agent is then busy and `continue` is on). Set beside notifyOnCompact, cleared at the same points.
+   */
+  nudgeAfterCompact?: { path?: string; instructions: string }
+  /** Raised on every main turn.start and conversation reset: a nudge started before a raise is stale (S1). */
+  epoch: number
   /** Origin of the prompt about to start a main turn (recorded by prompt.submit, taken by turn.start). */
   nextTurnOrigin?: TurnOrigin
   /** Origin of the main turn running or last ended; undefined when this mod did not see its prompt. */
@@ -49,6 +56,8 @@ export const MAX_REFUSALS = 3
 export function resetConversation(rt: Runtime): void {
   rt.flow = undefined
   rt.notifyOnCompact = false
+  rt.nudgeAfterCompact = undefined
+  rt.epoch++
   rt.compacting = false
   rt.pending = false
   rt.suggestAnnounced = undefined
@@ -61,7 +70,7 @@ export function resetConversation(rt: Runtime): void {
 
 export const newRuntime = (): Runtime => ({
   mainTurnRunning: false, pending: false, asking: false, interactive: true, backgroundTasks: 0, refusals: 0,
-  compacting: false, notifyOnCompact: false,
+  compacting: false, notifyOnCompact: false, epoch: 0,
 })
 
 export type Fill = { percent: number | undefined; tokens: number | undefined; window: number }

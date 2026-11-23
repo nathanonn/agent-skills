@@ -48,6 +48,16 @@ describe('config', () => {
     expect(parseSet('notify', 'false')).toEqual({ ok: true, key: 'notify', value: false })
     expect(parseSet('whenBusy', 'suggest')).toEqual({ ok: true, key: 'whenBusy', value: 'suggest' })
   })
+  test('continue takes on/off (and true/false); it is on by default, also for an old config without the key', () => {
+    expect(DEFAULTS.continue).toBe(true)
+    expect(parseSet('continue', 'off')).toEqual({ ok: true, key: 'continue', value: false })
+    expect(parseSet('continue', 'on')).toEqual({ ok: true, key: 'continue', value: true })
+    expect(parseSet('continue', 'false')).toEqual({ ok: true, key: 'continue', value: false })
+    expect(parseSet('continue', 'maybe').ok).toBe(false)
+    expect(mergeConfig({ enabled: true, notify: false, percent: 30 }).continue).toBe(true)
+    expect(mergeConfig({ continue: false }).continue).toBe(false)
+    expect(mergeConfig({ continue: 'off' }).continue).toBe(true) // not a boolean: the default
+  })
   test('refuses bad input', () => {
     expect(parseSet('bogus', '1').ok).toBe(false)
     expect(parseSet('percent', 'abc').ok).toBe(false)

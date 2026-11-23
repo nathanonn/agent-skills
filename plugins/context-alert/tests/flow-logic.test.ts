@@ -1,5 +1,6 @@
 import { test, describe, expect } from 'claude-code/testing'
 import {
+  continuePrompt,
   parseHandoffCompactArgs, busyAgentIds, diffBusy, focusInstructions, waitToast, foldPrompt, alreadyRunningToast,
   HANDOFF_COMPACTING_TOAST, CANCELLED_TOAST, TURN_NOT_FINISHED_TOAST, unionIds, countsTowardWritingCap, pathIgnored,
 } from '../hooks/flow-logic'
@@ -107,5 +108,13 @@ describe('review round 1 helpers', () => {
   test('pathIgnored', () => {
     expect(pathIgnored('Busy', undefined)).toBe('Busy')
     expect(pathIgnored('Busy', 'a.md')).toBe('Busy (path a.md ignored)')
+  })
+  test('continuePrompt: with and without a known path', () => {
+    expect(continuePrompt('/p/h.md')).toBe(
+      'Continue the work in progress from the handoff doc at /p/h.md. If nothing is left, or the next step needs the user, say so and stop.',
+    )
+    expect(continuePrompt(undefined)).toBe(
+      'Continue the work in progress from the handoff doc. If nothing is left, or the next step needs the user, say so and stop.',
+    )
   })
 })

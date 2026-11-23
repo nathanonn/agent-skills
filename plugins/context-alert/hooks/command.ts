@@ -6,7 +6,7 @@ import { CONFIG_KEY, loadConfig, loadSession, updateSession } from './state'
 
 const USAGE =
   'Usage: /context-alert [status | show] | set <key> <value> | reset | reset session\n' +
-  'Keys: enabled, notify, midTurnToast (true/false); percent, tokens, stepPercent, stepTokens (numbers); trigger (percent/tokens/either); whenBusy (dialog/suggest)'
+  'Keys: enabled, notify, midTurnToast, continue (on/off, or true/false); percent, tokens, stepPercent, stepTokens (numbers); trigger (percent/tokens/either); whenBusy (dialog/suggest)'
 
 function fmtLimits(c: Config): string {
   if (c.trigger === 'percent') return `first alert at ${c.percent}%, then every +${c.stepPercent} points (trigger: percent)`
@@ -22,7 +22,7 @@ function fmtNext(c: Config, t: { pct: number; tokens: number }): string {
 
 function fmtConfig(c: Config): string {
   return [
-    `enabled ${c.enabled} · notify ${c.notify} · midTurnToast ${c.midTurnToast} · whenBusy ${c.whenBusy}`,
+    `enabled ${c.enabled} · notify ${c.notify} · midTurnToast ${c.midTurnToast} · continue ${c.continue} · whenBusy ${c.whenBusy}`,
     fmtLimits(c),
   ].join('\n')
 }

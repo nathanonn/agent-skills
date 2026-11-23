@@ -2,7 +2,7 @@
 
 A Claude Code mod that notices when your context window is getting heavy and offers to write a handoff doc before compaction.
 
-Version 0.2.0 · Works with: Claude Code plugin (marketplace install only)
+Version 0.2.1 · Works with: Claude Code plugin (marketplace install only)
 
 **Beta.** The core flow is verified live.
 
@@ -86,6 +86,18 @@ Writes the handoff doc, then compacts. It works even when `enabled` is false.
 - **Dialog.** The dialog's "Handoff, then compact" uses the same flow. Alert dialogs are held while a flow is in progress.
 - **Notification.** Sent after compaction only if the flow waited for agents and `notify` is on.
 
+After the compaction lands, the mod sends one prompt so the session carries on instead of sitting idle: `Continue the work in progress from the handoff doc at <path>. If nothing is left, or the next step needs the user, say so and stop.` It is on by default. Turn it off with `/context-alert set continue off`.
+
+No prompt is sent when:
+
+- `continue` is off.
+- The session is headless.
+- An agent is still busy when the compaction lands. Its report wakes the session.
+- The agent list can't be read.
+- The compaction was a plain "Compact now", a typed `/compact`, or an auto-compaction.
+
+Background shells do not block the prompt.
+
 Ways out:
 
 | What happens | Result |
@@ -111,14 +123,15 @@ Anything else after `reset` prints the usage text and changes nothing.
 
 | Key | Default | Values |
 |---|---|---|
-| `enabled` | `true` | `true` / `false`. When false, no alert runs, including toast and notification. `/handoff-compact` still runs, since you start it yourself |
+| `enabled` | `true` | `on` / `off` (or `true` / `false`). When off, no alert runs, including toast and notification. `/handoff-compact` still runs, since you start it yourself |
 | `trigger` | `percent` | `percent` / `tokens` / `either`. Which limit counts (see Trigger modes) |
 | `percent` | `40` | first alert at this percent of the window (above 0, up to 100; decimals such as 0.5 are accepted). Setting it switches the trigger to `percent` |
 | `tokens` | `300000` | first alert at this many tokens (whole number). Setting it switches the trigger to `tokens` |
 | `stepPercent` | `15` | later alerts every this many points (same range as `percent`) |
 | `stepTokens` | `150000` | later alerts every this many tokens (whole number) |
-| `notify` | `true` | `true` / `false` |
-| `midTurnToast` | `true` | `true` / `false` |
+| `notify` | `true` | `on` / `off` (or `true` / `false`) |
+| `midTurnToast` | `true` | `on` / `off` (or `true` / `false`) |
+| `continue` | `true` | `on` / `off` (or `true` / `false`). After a handoff flow's compaction, send one prompt to carry on from the doc (see The /handoff-compact command) |
 | `whenBusy` | `dialog` | `dialog` / `suggest` |
 
 ### Trigger modes
@@ -133,7 +146,7 @@ The trigger decides which limit counts, for the first alert and for the later st
 
 **Upgrading from 0.1.0:** a saved config without a trigger reads as `percent`, so the token limit no longer counts. Run `/context-alert set trigger either` to keep the old "whichever first" behaviour with the 300k cap.
 
-Settings are kept across sessions. A bad key or value is refused with a message.
+Every true/false setting also accepts `on` / `off`. Settings are kept across sessions. A bad key or value is refused with a message.
 
 ## Install
 
@@ -172,7 +185,7 @@ claude plugin test plugins/context-alert
 - Claude Code's hook API defines no reason when it refuses a dialog, so a refusal is told from a dismissal by the message text; unknown reasons count as a dismissal.
 - Session resume: the handoff path is recovered only at process start (see The handoff chain).
 - Two sessions at once share one settings file; a change made in one reaches the other at its next turn end.
-- Headless runs (`-p`) have no dialog and no notification. The plugin stays silent.
+- Headless runs (`-p`) have no dialog, no notification and no continue prompt. The plugin stays silent.
 - Fill is unknown on a fresh or just-compacted session; the plugin skips until a response reports it.
 - Sessions older than 30 days are dropped from stored state.
 - No icon is included yet.

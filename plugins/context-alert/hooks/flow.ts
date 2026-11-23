@@ -4,8 +4,8 @@
 import type { EngineInterface } from 'claude-code'
 import type { Runtime } from './alert'
 import {
-  ALREADY_COMPACTING_TOAST, alreadyRunningToast, busyAgentIds, CANCELLED_TOAST, countsTowardWritingCap, diffBusy,
-  focusInstructions, foldPrompt, HANDOFF_COMPACTING_TOAST, NO_DOC_WRITTEN_TOAST, NOW_UPGRADE_TOAST,
+  ALREADY_COMPACTING_TOAST, alreadyRunningToast, busyAgentIds, CANCELLED_TOAST, continuePrompt, countsTowardWritingCap,
+  diffBusy, focusInstructions, nudgeMatches, foldPrompt, HANDOFF_COMPACTING_TOAST, NO_DOC_WRITTEN_TOAST, NOW_UPGRADE_TOAST,
   parseHandoffCompactArgs, pathIgnored, TURN_NOT_FINISHED_TOAST, unionIds, WAITED_NOTIFICATION,
   WAITED_NOTIFICATION_TITLE, waitToast, type ListedAgent,
 } from './flow-logic'
@@ -106,14 +106,14 @@ export async function compactNow($: EngineInterface, rt?: Runtime, instructions?
     if (!result.skip) {
       log($, `compact via session.compact${instructions ? ' (focus in instructions)' : ''}`)
       // This mod's own session.compact skips its own hooks, so the hook's work is done here.
-      if (rt) await afterCompaction($, rt, instructions)
+      if (rt) await afterCompaction($, rt, instructions, 'plugin')
       return true
     }
     why = `vetoed: ${result.skip}` // another plugin's hook skipped it
   } catch (err) {
     why = `rejected: ${String(err)}`
   }
-  if (rt) rt.compacting = false
+  if (rt) { rt.compacting = false; rt.nudgeAfterCompact = undefined }
   try {
     $.ui.log(`context-alert: session.compact ${why}`)
     $.ui.toast("Compaction couldn't start; run /compact")
@@ -126,6 +126,7 @@ export async function startFlow(
   $: EngineInterface, rt: Runtime, o: { source: Flow['source']; path?: string; force: boolean },
 ): Promise<void> {
   rt.notifyOnCompact = false
+  rt.nudgeAfterCompact = undefined
   const f: Flow = {
     source: o.source, phase: 'writing', path: o.path, pathLocked: false, wrote: false, turns: 0, force: o.force,
     waited: false, busy: [], foldPending: false, labels: {}, shown: 0,
@@ -156,10 +157,11 @@ async function liveAgents($: EngineInterface, f: Flow): Promise<string[] | undef
 async function compactFlow($: EngineInterface, rt: Runtime, f: Flow, toast = HANDOFF_COMPACTING_TOAST): Promise<void> {
   if (rt.flow === f) rt.flow = undefined
   rt.notifyOnCompact = f.waited
+  rt.nudgeAfterCompact = { path: f.path, instructions: focusInstructions(f.path) } // sent from afterCompaction, once it lands
   $.ui.toast(toast)
   // This mod's own command.run hooks never see its /handoff-doc call, so a path outside handoff/ is recorded here.
   if (f.path) await rememberHandoffPath($, f.path).catch(() => undefined)
-  if (!(await compactNow($, rt, focusInstructions(f.path)))) rt.notifyOnCompact = false
+  if (!(await compactNow($, rt, focusInstructions(f.path)))) { rt.notifyOnCompact = false; rt.nudgeAfterCompact = undefined }
 }
 
 /** 06's check(): fold in finished agents, wait while any are busy (unless `force`), else compact. Never throws. */
@@ -311,16 +313,56 @@ export function onFlowPrompt(
  * A main-thread compaction landed (not vetoed): the tiers start over (D15), any flow ends, and the notification
  * goes out only when the flow waited for agents (D26). The state resets run before the first await.
  */
-export async function afterCompaction($: EngineInterface, rt: Runtime, instructions: string | undefined): Promise<void> {
+export async function afterCompaction(
+  $: EngineInterface, rt: Runtime, instructions: string | undefined, trigger?: string,
+): Promise<void> {
   rt.compacting = false
   rt.pending = false
   rt.suggestAnnounced = undefined
   const waited = rt.notifyOnCompact || rt.flow?.waited === true
   if (rt.flow || rt.notifyOnCompact) log($, `compaction landed, instructions ${instructions ? 'present' : 'absent'}`)
+  // Taken here, before any await: this runs once per compaction, whichever hook or call reaches it first.
+  const nudge = rt.nudgeAfterCompact
+  const epoch = rt.epoch
   rt.flow = undefined
   rt.notifyOnCompact = false
+  rt.nudgeAfterCompact = undefined
   try { await updateSession($, await $.session.id(), resetTiers) } catch { /* the notification still goes */ }
-  if (!waited || !rt.interactive) return
-  const cfg = await loadConfig($)
-  if (cfg.notify) await $.ui.notify(WAITED_NOTIFICATION, { title: WAITED_NOTIFICATION_TITLE })
+  if (waited && rt.interactive) {
+    try {
+      if ((await loadConfig($)).notify) await $.ui.notify(WAITED_NOTIFICATION, { title: WAITED_NOTIFICATION_TITLE })
+    } catch { /* the nudge still goes */ }
+  }
+  if (!nudge) return
+  const m = nudgeMatches(nudge.instructions, instructions, trigger)
+  if (!m.send) return log($, `no continue nudge: ${m.note}`)
+  if (instructions === undefined) log($, `continue nudge: ${m.note}`)
+  await nudgeToContinue($, rt, nudge.path, epoch)
+}
+
+/**
+ * After a handoff flow's compaction: with no top-level agent busy nothing would wake the session, so submit one
+ * continue prompt. Skipped (and logged) when `continue` is off, the run is headless, the agent list cannot be read,
+ * or a new turn began (or /clear ran) since the compaction landed.
+ * With agents still running their reports wake it. Background shells do not count. Never throws.
+ */
+async function nudgeToContinue($: EngineInterface, rt: Runtime, path: string | undefined, epoch: number): Promise<void> {
+  try {
+    if (!rt.interactive) return log($, 'no continue nudge: not an interactive session')
+    if (!(await loadConfig($)).continue) return log($, 'no continue nudge: continue is off')
+    let busy: string[]
+    try {
+      busy = busyAgentIds(await $.agent.list())
+    } catch (err) {
+      return log($, `no continue nudge: agent.list failed: ${String(err)}`)
+    }
+    if (busy.length > 0) return log($, `no continue nudge: ${busy.length} agent(s) still running`)
+    // The awaits above let a turn start (the person's queued message) or /clear run: then the nudge is stale.
+    if (rt.epoch !== epoch || rt.mainTurnRunning) return log($, 'no continue nudge: a new turn started or the conversation was cleared')
+    const r = await $.prompt.submit({ text: continuePrompt(path), asUser: true })
+    const dropped = (r as { drop?: string } | undefined)?.drop
+    log($, dropped ? `continue nudge dropped: ${dropped}` : `continue nudge sent (${path ? 'path known' : 'no path'})`)
+  } catch (err) {
+    log($, `continue nudge failed: ${String(err)}`)
+  }
 }

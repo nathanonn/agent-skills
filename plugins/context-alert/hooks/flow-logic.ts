@@ -70,6 +70,30 @@ export function focusInstructions(path: string | undefined): string {
     : 'A handoff doc was written for this session. Keep its path and its Open follow-ups in the summary.'
 }
 
+/** The nudge sent once a handoff flow's compaction landed with no agent still running. */
+export function continuePrompt(path: string | undefined): string {
+  const doc = path ? `the handoff doc at ${path}` : 'the handoff doc'
+  return `Continue the work in progress from ${doc}. If nothing is left, or the next step needs the user, say so and stop.`
+}
+
+/**
+ * Whether the compaction that landed is the one the flow asked for. With `instructions` they must equal the focus
+ * text the flow sent (a typed `/compact <text>` or another plugin's compaction differs). Without them, a manual
+ * trigger counts (whether the command path hands `/compact`'s args over as instructions is not verified live),
+ * and an auto, plugin or precompute trigger never does.
+ * Known hole: a bare typed `/compact` after the flow's queued compaction was silently dropped would nudge.
+ */
+export function nudgeMatches(
+  stored: string, instructions: string | undefined, trigger: string | undefined,
+): { send: boolean; note: string } {
+  if (instructions !== undefined) {
+    return instructions === stored
+      ? { send: true, note: 'instructions match' }
+      : { send: false, note: 'instructions differ: another compaction' }
+  }
+  return { send: trigger === 'manual', note: `instructions missing, trigger ${trigger ?? 'unknown'}` }
+}
+
 /** `Waiting for N agent(s) before compacting`, plus the other-background-tasks note when any are known. */
 export function waitToast(count: number, otherTasks = 0): string {
   const base = `Waiting for ${count} ${count === 1 ? 'agent' : 'agents'} before compacting`
