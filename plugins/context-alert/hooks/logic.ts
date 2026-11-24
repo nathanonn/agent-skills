@@ -3,8 +3,12 @@
 export type Trigger = 'percent' | 'tokens' | 'either'
 export const TRIGGERS: readonly Trigger[] = ['percent', 'tokens', 'either']
 
+export type Mode = 'auto' | 'ask' | 'off'
+export const MODES: readonly Mode[] = ['auto', 'ask', 'off']
+
 export type Config = {
-  enabled: boolean
+  /** `auto`: a crossing starts the handoff-compact flow, no dialog. `ask`: the dialog. `off`: no alerts. */
+  mode: Mode
   trigger: Trigger
   percent: number
   tokens: number
@@ -15,10 +19,27 @@ export type Config = {
   midTurnToast: boolean
   /** After a handoff-compact flow's compaction, nudge the session to carry on when no agent is still running. */
   continue: boolean
+  /** Auto flows: minutes to wait for busy agents before compacting anyway; 0 = no limit. */
+  maxWait: number
+  /**
+   * Tokens left before Claude Code's own auto-compact below which a flow stops waiting. `auto` (the default, D39) is
+   * `min(80000, 15% of the auto-compact threshold)`; a number is used as is; 0 = no check.
+   */
+  reserve: number | 'auto'
+  /** Auto cycles allowed per `cycleWindow` before auto falls back to the dialog; 0 = no cap. */
+  maxCycles: number
+  /** The window, in minutes, `maxCycles` counts over. */
+  cycleWindow: number
+  /** Any mode: Claude Code's own auto-compaction gets focus instructions (S4). */
+  focusAutoCompact: boolean
+  /** Auto mode: after Claude Code's own auto-compaction, write a handoff doc (if none since the last one), then continue (S4). */
+  afterAutoCompact: boolean
+  /** Auto mode, no known path: where a new handoff doc goes. Empty = unset (then ./handoff/). */
+  handoffDir: string
 }
 
 export const DEFAULTS: Config = {
-  enabled: true,
+  mode: 'ask',
   trigger: 'percent',
   percent: 40,
   tokens: 300000,
@@ -28,11 +49,27 @@ export const DEFAULTS: Config = {
   whenBusy: 'dialog',
   midTurnToast: true,
   continue: true,
+  maxWait: 20,
+  reserve: 'auto',
+  maxCycles: 3,
+  cycleWindow: 60,
+  focusAutoCompact: true,
+  afterAutoCompact: true,
+  handoffDir: '',
 }
+
+/** Alerts are on in `ask` and `auto` mode. */
+export const isEnabled = (cfg: Pick<Config, 'mode'>): boolean => cfg.mode !== 'off'
 
 export type Asked = { pct: number; tokens: number; at: number }
 export type SessionState = {
   asked: Asked[]
+  /** Start times (ms) of auto cycles, newest last; pruned to the cycle window when read. */
+  autoStarts?: number[]
+  /** `/context-alert pause`: no alerts and no auto cycles for this session. */
+  paused?: boolean
+  /** Loop breaker: a compaction left the fill past the first threshold, so crossings use the dialog until it drops. */
+  autoHeld?: boolean
   handoff?: string
   updatedAt?: number
   /** The threshold a mid-turn toast was shown for (so it shows once per tier). */
@@ -45,8 +82,13 @@ export type SetResult =
   | { ok: true; key: keyof Config; value: Config[keyof Config] }
   | { ok: false; error: string }
 
-const BOOL_KEYS = ['enabled', 'notify', 'midTurnToast', 'continue'] as const
-const NUM_KEYS = ['percent', 'tokens', 'stepPercent', 'stepTokens'] as const
+const BOOL_KEYS = ['notify', 'midTurnToast', 'continue', 'focusAutoCompact', 'afterAutoCompact'] as const
+/** Positive numbers only. */
+const NUM_KEYS = ['percent', 'tokens', 'stepPercent', 'stepTokens', 'cycleWindow'] as const
+/** `0` is allowed (no limit / no check / no cap). */
+const ZERO_KEYS = ['maxWait', 'maxCycles'] as const
+/** Whole numbers only. */
+const INT_KEYS = ['tokens', 'stepTokens', 'maxCycles'] as const
 
 export function mergeConfig(stored: unknown): Config {
   const out: Config = { ...DEFAULTS }
@@ -57,6 +99,16 @@ export function mergeConfig(stored: unknown): Config {
       const v = s[k]
       if (typeof v === 'number' && Number.isFinite(v) && v > 0) out[k] = v
     }
+    for (const k of ZERO_KEYS) {
+      const v = s[k]
+      if (typeof v === 'number' && Number.isFinite(v) && v >= 0) out[k] = v
+    }
+    if (s.reserve === 'auto') out.reserve = 'auto'
+    else if (typeof s.reserve === 'number' && Number.isFinite(s.reserve) && s.reserve >= 0 && Number.isInteger(s.reserve)) out.reserve = s.reserve
+    // mode, else the 0.2 `enabled` flag: false reads as off, anything else as ask.
+    if (s.mode === 'auto' || s.mode === 'ask' || s.mode === 'off') out.mode = s.mode
+    else if (s.enabled === false) out.mode = 'off'
+    if (typeof s.handoffDir === 'string') out.handoffDir = s.handoffDir.trim()
     if (s.trigger === 'percent' || s.trigger === 'tokens' || s.trigger === 'either') out.trigger = s.trigger
     if (s.whenBusy === 'dialog' || s.whenBusy === 'suggest') out.whenBusy = s.whenBusy
   }
@@ -65,23 +117,48 @@ export function mergeConfig(stored: unknown): Config {
 
 export function parseSet(key: string, raw: string): SetResult {
   const value = raw.trim()
+  if (key === 'enabled') {
+    // The 0.2 name, kept as an alias: on is `mode ask`, off is `mode off`.
+    const v = value.toLowerCase()
+    if (v === 'true' || v === 'on') return { ok: true, key: 'mode', value: 'ask' }
+    if (v === 'false' || v === 'off') return { ok: true, key: 'mode', value: 'off' }
+    return { ok: false, error: `enabled takes on or off (true or false), got "${value}"` }
+  }
+  if (key === 'mode') {
+    const v = value.toLowerCase()
+    if (v === 'auto' || v === 'ask' || v === 'off') return { ok: true, key, value: v }
+    return { ok: false, error: `mode takes auto, ask or off, got "${value}"` }
+  }
   if ((BOOL_KEYS as readonly string[]).includes(key)) {
     const v = value.toLowerCase()
     if (v === 'true' || v === 'on') return { ok: true, key: key as keyof Config, value: true }
     if (v === 'false' || v === 'off') return { ok: true, key: key as keyof Config, value: false }
     return { ok: false, error: `${key} takes on or off (true or false), got "${value}"` }
   }
-  if ((NUM_KEYS as readonly string[]).includes(key)) {
-    if (!/^\d+(\.\d+)?$/.test(value)) return { ok: false, error: `${key} takes a positive number, got "${value}"` }
+  const zeroOk = (ZERO_KEYS as readonly string[]).includes(key)
+  if ((NUM_KEYS as readonly string[]).includes(key) || zeroOk) {
+    if (!/^\d+(\.\d+)?$/.test(value)) {
+      return { ok: false, error: `${key} takes a ${zeroOk ? 'number (0 = no limit)' : 'positive number'}, got "${value}"` }
+    }
     const n = Number(value)
-    if (n <= 0) return { ok: false, error: `${key} must be above 0` }
+    if (n <= 0 && !zeroOk) return { ok: false, error: `${key} must be above 0` }
     if ((key === 'percent' || key === 'stepPercent') && n > 100) {
       return { ok: false, error: `${key} must be between 1 and 100` }
     }
-    if ((key === 'tokens' || key === 'stepTokens') && !Number.isInteger(n)) {
-      return { ok: false, error: `${key} takes a whole number of tokens` }
+    if ((INT_KEYS as readonly string[]).includes(key) && !Number.isInteger(n)) {
+      return { ok: false, error: `${key} takes a whole number${key === 'maxCycles' ? '' : ' of tokens'}` }
     }
     return { ok: true, key: key as keyof Config, value: n }
+  }
+  if (key === 'reserve') {
+    // `auto` (or `default`) puts back the window-scaled default; a number is used as is, 0 = no check.
+    if (value.toLowerCase() === 'auto' || value.toLowerCase() === 'default') return { ok: true, key, value: 'auto' }
+    if (!/^\d+$/.test(value)) return { ok: false, error: `reserve takes a whole number of tokens (0 = no check), or auto, got "${value}"` }
+    return { ok: true, key, value: Number(value) }
+  }
+  if (key === 'handoffDir') {
+    if (!value) return { ok: false, error: 'handoffDir takes a folder path, or none to clear it' }
+    return { ok: true, key, value: value.toLowerCase() === 'none' ? '' : value }
   }
   if (key === 'whenBusy') {
     if (value === 'dialog' || value === 'suggest') return { ok: true, key, value }
@@ -91,7 +168,7 @@ export function parseSet(key: string, raw: string): SetResult {
     if (value === 'percent' || value === 'tokens' || value === 'either') return { ok: true, key, value }
     return { ok: false, error: `trigger takes percent, tokens or either, got "${value}"` }
   }
-  const keys = [...BOOL_KEYS, ...NUM_KEYS, 'trigger', 'whenBusy'].join(', ')
+  const keys = ['mode', 'enabled', ...BOOL_KEYS, ...NUM_KEYS, ...ZERO_KEYS, 'reserve', 'handoffDir', 'trigger', 'whenBusy'].join(', ')
   return { ok: false, error: `unknown key "${key}". Keys: ${keys}` }
 }
 
@@ -137,7 +214,7 @@ export function shouldFire(
   percent: number | undefined,
   tokens: number | undefined,
 ): boolean {
-  if (!cfg.enabled) return false
+  if (!isEnabled(cfg)) return false
   return crossed(cfg, nextThreshold(state, cfg), percent, tokens)
 }
 
@@ -148,9 +225,9 @@ export function rearm(
   percent: number | undefined,
   tokens: number | undefined,
 ): SessionState {
-  if (state.asked.length === 0 && !state.toastedAt) return state
+  if (state.asked.length === 0 && !state.toastedAt && !state.autoHeld) return state
   if (belowFirst(cfg, percent, tokens)) {
-    const { toastedAt: _gone, ...rest } = state
+    const { toastedAt: _gone, autoHeld: _held, ...rest } = state // the loop breaker lets go once the fill is down
     return { ...rest, asked: [] }
   }
   return state
@@ -298,3 +375,88 @@ export function dialogOptions(path: string | undefined): DialogOptions {
   const verb = path ? 'Update handoff' : 'Handoff'
   return { thenCompact: `${verb}, then compact`, only: `${verb} only`, compact: 'Compact now', notNow: 'Not now' }
 }
+
+// ---- autopilot (0.3.0, proposal 07) ----
+
+const MINUTE_MS = 60_000
+
+/** Auto cycle start times still inside the window (`now` minus `cycleWindow` minutes). */
+export function startsInWindow(starts: readonly number[] | undefined, now: number, cfg: Pick<Config, 'cycleWindow'>): number[] {
+  return (starts ?? []).filter((t) => now - t < cfg.cycleWindow * MINUTE_MS)
+}
+
+/** May another auto cycle start? `maxCycles` 0 is no cap. `count` is the cycles already in the window. */
+export function cycleAllowed(
+  starts: readonly number[] | undefined, now: number, cfg: Pick<Config, 'maxCycles' | 'cycleWindow'>,
+): { ok: boolean; count: number } {
+  const count = startsInWindow(starts, now, cfg).length
+  return { ok: cfg.maxCycles === 0 || count < cfg.maxCycles, count }
+}
+
+/** Record an auto cycle start, dropping the ones that left the window. */
+export function withAutoStart(s: SessionState, now: number, cfg: Pick<Config, 'cycleWindow'>): SessionState {
+  return { ...s, autoStarts: [...startsInWindow(s.autoStarts, now, cfg), now] }
+}
+
+export type WaitWhy = 'no-agents' | 'room' | 'maxWait' | 'wait'
+
+/**
+ * S2's tree: compact when no agent is busy, when the room left before Claude Code's own auto-compact is under
+ * `reserve` (any flow), or when an auto flow has waited `maxWaitMs` (0 = no limit). An unknown room (auto-compact
+ * off, or unreadable) never counts as "no room". `reserve` 0 is no check.
+ */
+export function waitDecision(o: {
+  busy: boolean
+  room: number | undefined
+  reserve: number
+  waitedMs: number
+  maxWaitMs: number
+  auto: boolean
+}): { go: boolean; why: WaitWhy } {
+  if (!o.busy) return { go: true, why: 'no-agents' }
+  if (o.room !== undefined && o.reserve > 0 && o.room < o.reserve) return { go: true, why: 'room' }
+  if (o.auto && o.maxWaitMs > 0 && o.waitedMs >= o.maxWaitMs) return { go: true, why: 'maxWait' }
+  return { go: false, why: 'wait' }
+}
+
+export const RESERVE_CAP = 80_000
+export const RESERVE_SHARE = 0.15
+
+/**
+ * The reserve in force (D39): a number the person set is used as is (0 = no check); `auto` is
+ * `min(80k, 15% of the auto-compact threshold)`, and 0 (skip the check) when the threshold is unknown.
+ */
+export function effectiveReserve(reserve: Config['reserve'], threshold: number | undefined): number {
+  if (reserve !== 'auto') return reserve
+  if (typeof threshold !== 'number') return 0
+  return Math.min(RESERVE_CAP, Math.round(threshold * RESERVE_SHARE))
+}
+
+/** Tokens left before auto-compact runs, or undefined when either figure is unknown. */
+export function roomLeft(threshold: number | undefined, tokens: number | undefined): number | undefined {
+  if (typeof threshold !== 'number' || typeof tokens !== 'number') return undefined
+  return threshold - tokens
+}
+
+/** "5%" / "300k tokens" / "40% or 300k tokens": the next alert, in the active measure(s). */
+export function fmtNext(c: Config, t: { pct: number; tokens: number }): string {
+  if (c.trigger === 'percent') return `${t.pct}%`
+  if (c.trigger === 'tokens') return `${formatTokens(t.tokens)} tokens`
+  return `${t.pct}% or ${formatTokens(t.tokens)} tokens`
+}
+
+/** The auto folder with a trailing slash. */
+export function dirWithSlash(dir: string | undefined): string {
+  const d = dir && dir.trim() ? dir.trim() : './handoff/'
+  return d.endsWith('/') ? d : `${d}/`
+}
+
+/** `existing` then the focus, or the focus alone. */
+export function appendInstructions(existing: string | undefined, focus: string): string {
+  return existing && existing.trim() ? `${existing.trim()}\n\n${focus}` : focus
+}
+
+export const NO_PATH_AUTO_FOCUS = 'Keep the work in progress, the decisions made and the open follow-ups in the summary.'
+
+export const CYCLE_NOTE = (count: number, minutes: number): string =>
+  `Auto paused: ${count} ${count === 1 ? 'cycle' : 'cycles'} in the last ${minutes} min.`

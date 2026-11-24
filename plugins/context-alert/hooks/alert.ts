@@ -1,11 +1,11 @@
 import type { EngineInterface } from 'claude-code'
-import { compactNow, runHandoff, startFlow, type Flow } from './flow'
-import type { TurnOrigin } from './flow-logic'
+import { compactNow, endFlow, runHandoff, startFlow, type Flow } from './flow'
+import { autoStartToast, type TurnOrigin } from './flow-logic'
 import {
-  classifyAskError, dialogOptions, formatTokens, isBusyStatus, nextThreshold, questionText, rearm, shouldFire,
-  type Asked, type Config,
+  classifyAskError, CYCLE_NOTE, cycleAllowed, dialogOptions, formatTokens, isBusyStatus, isEnabled, nextThreshold, questionText,
+  rearm, shouldFire, type Asked, type Config, type SessionState,
 } from './logic'
-import { loadConfig, recordTier, unrecordTier, updateSession } from './state'
+import { loadConfig, recordAutoStart, recordTier, unrecordTier, updateSession } from './state'
 
 /**
  * Per-load state of the hooks module (its "module variables"). One object, created by `register`,
@@ -39,7 +39,7 @@ export type Runtime = {
    * A handoff flow asked for a compaction: once it lands, nudge the session to continue from the doc at `path`
    * (if no agent is then busy and `continue` is on). Set beside notifyOnCompact, cleared at the same points.
    */
-  nudgeAfterCompact?: { path?: string; instructions: string }
+  nudgeAfterCompact?: { path?: string; instructions: string; auto?: { left: number } }
   /** Raised on every main turn.start and conversation reset: a nudge started before a raise is stale (S1). */
   epoch: number
   /** Origin of the prompt about to start a main turn (recorded by prompt.submit, taken by turn.start). */
@@ -48,15 +48,43 @@ export type Runtime = {
   turnOrigin?: TurnOrigin
   /** A compaction this mod started is queued: no dialog until it lands (session.compact) or a main turn starts. */
   compacting: boolean
+  /** A main-thread handoff doc write since the last landed compaction (S4); every landed compaction clears it. */
+  handoffSinceCompact: boolean
+  /**
+   * S4: Claude Code compacted by itself and a handoff/continue prompt waits for the next idle point.
+   * Cleared when it is sent or dropped, at the next compaction, a main turn start or a conversation reset.
+   */
+  afterAuto?: { kind: 'handoff' | 'continue'; path?: string; dir: string; epoch: number }
+  /** An S4 handoff prompt was sent and its turn runs: a .md written meanwhile is the handoff doc. Cleared when the turn ends. */
+  afterAutoHandoff?: { locked: boolean }
+  /** The loop breaker could not read the fill right after an auto cycle's compaction: check at the next measure. */
+  loopCheck: boolean
 }
 
 export const MAX_REFUSALS = 3
 
+/**
+ * What a crossing does in this session right now: `auto` starts the handoff-compact flow with no dialog; otherwise the
+ * dialog, with `cap` set when auto mode fell back to it because `maxCycles` was reached (S6). Auto never runs in a
+ * non-interactive run, while paused, or while the loop breaker holds it.
+ */
+export function autoPlan(
+  cfg: Config, state: SessionState, rt: Pick<Runtime, 'interactive'>, now: number,
+): { auto: boolean; cap?: { count: number } } {
+  if (cfg.mode !== 'auto' || !rt.interactive || state.paused || state.autoHeld) return { auto: false }
+  const c = cycleAllowed(state.autoStarts, now, cfg)
+  return c.ok ? { auto: true } : { auto: false, cap: { count: c.count } }
+}
+
 /** /clear or an in-process /resume: the conversation this state described is gone, the process goes on. */
 export function resetConversation(rt: Runtime): void {
-  rt.flow = undefined
+  endFlow(rt)
   rt.notifyOnCompact = false
   rt.nudgeAfterCompact = undefined
+  rt.afterAuto = undefined
+  rt.afterAutoHandoff = undefined
+  rt.loopCheck = false
+  rt.handoffSinceCompact = false
   rt.epoch++
   rt.compacting = false
   rt.pending = false
@@ -70,7 +98,7 @@ export function resetConversation(rt: Runtime): void {
 
 export const newRuntime = (): Runtime => ({
   mainTurnRunning: false, pending: false, asking: false, interactive: true, backgroundTasks: 0, refusals: 0,
-  compacting: false, notifyOnCompact: false, epoch: 0,
+  compacting: false, notifyOnCompact: false, epoch: 0, handoffSinceCompact: false, loopCheck: false,
 })
 
 export type Fill = { percent: number | undefined; tokens: number | undefined; window: number }
@@ -110,23 +138,39 @@ async function currentFill($: EngineInterface): Promise<Fill | undefined> {
  */
 export async function tryAlert($: EngineInterface, rt: Runtime, given?: Fill): Promise<void> {
   if (rt.asking || rt.compacting) return
-  if (rt.flow) { rt.pending = true; return } // held while a handoff-compact flow runs (D25); retried once it ends
+  // held while a handoff-compact flow runs (D25) or an after-compaction prompt waits (S4); retried once it ends
+  if (rt.flow || rt.afterAuto) { rt.pending = true; return }
   if (rt.mainTurnRunning) { rt.pending = true; return }
   rt.asking = true // held from the decision through the answer, so two callers cannot both decide
-  let action: { kind: 'handoff'; thenCompact: boolean } | { kind: 'compact' } | { kind: 'text'; text: string } | undefined
+  let action: { kind: 'handoff'; thenCompact: boolean } | { kind: 'compact' } | { kind: 'text'; text: string } | { kind: 'auto' } | undefined
   let handoff: string | undefined
+  let dir: string | undefined
   try {
     const cfg = await refreshConfig($, rt)
-    if (!cfg.enabled) { rt.pending = false; return }
+    if (!isEnabled(cfg)) { rt.pending = false; return }
     const fill = given ?? (await currentFill($))
     if (!fill || fill.percent === undefined || fill.tokens === undefined) return
     const { percent, tokens, window } = fill
     const sid = await $.session.id()
     const state = await updateSession($, sid, (s) => rearm(s, cfg, percent, tokens))
+    if (state.paused) { rt.pending = false; return } // /context-alert pause: no alerts, no auto cycles
     if (!shouldFire(state, cfg, percent, tokens)) { rt.pending = false; return }
     if (rt.mainTurnRunning) { rt.pending = true; return } // a turn began while we looked
     handoff = state.handoff
+    dir = cfg.handoffDir
     const entry: Asked = { pct: percent, tokens, at: await $.clock.now() }
+    const plan = autoPlan(cfg, state, rt, entry.at)
+    crossing: {
+    if (plan.auto) {
+      // Auto mode (S1): no dialog. The tier is used, the cycle counted, and the flow starts outside the guard below.
+      await recordTier($, sid, entry)
+      await recordAutoStart($, sid, entry.at, cfg)
+      rt.pending = false
+      $.ui.toast(autoStartToast(percent, tokens))
+      action = { kind: 'auto' }
+      break crossing
+    }
+    if (plan.cap) $.ui.toast(CYCLE_NOTE(plan.cap.count, cfg.cycleWindow)) // the cap is reached: this crossing asks instead
     const question = questionText(percent, tokens, window, handoff)
     const tier = nextThreshold(state, cfg)
     const tierKey = `${tier.pct}/${tier.tokens}`
@@ -183,6 +227,7 @@ export async function tryAlert($: EngineInterface, rt: Runtime, given?: Fill): P
       }
       return
     }
+    }
   } catch {
     // headless (-p), or a host call refused: stay silent
     return
@@ -192,7 +237,8 @@ export async function tryAlert($: EngineInterface, rt: Runtime, given?: Fill): P
 
   // The dialog is closed; run the chosen action outside the guard.
   try {
-    if (action?.kind === 'handoff') {
+    if (action?.kind === 'auto') await startFlow($, rt, { source: 'auto', path: handoff, force: false, dir })
+    else if (action?.kind === 'handoff') {
       // "Handoff, then compact" is the same flow as /handoff-compact (D25), with the agent wait.
       if (action.thenCompact) await startFlow($, rt, { source: 'dialog', path: handoff, force: false })
       else await runHandoff($, handoff)

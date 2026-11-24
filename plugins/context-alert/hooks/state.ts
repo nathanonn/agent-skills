@@ -1,5 +1,5 @@
 import type { EngineInterface } from 'claude-code'
-import { emptyState, mergeConfig, staleSessionKeys, type Asked, type Config, type SessionState } from './logic'
+import { emptyState, mergeConfig, staleSessionKeys, withAutoStart, type Asked, type Config, type SessionState } from './logic'
 
 export const CONFIG_KEY = 'config'
 export const sessionKey = (sid: string) => `session:${sid}`
@@ -45,6 +45,29 @@ export function unrecordTier($: EngineInterface, sid: string, entry: Asked): Pro
   return updateSession($, sid, (s) => {
     const i = s.asked.map((a) => a.at === entry.at && a.pct === entry.pct && a.tokens === entry.tokens).lastIndexOf(true)
     return i < 0 ? s : { ...s, asked: s.asked.filter((_, j) => j !== i) }
+  })
+}
+
+/** Record the start of an auto cycle (it counts toward `maxCycles`). */
+export function recordAutoStart($: EngineInterface, sid: string, now: number, cfg: Pick<Config, 'cycleWindow'>): Promise<SessionState> {
+  return updateSession($, sid, (s) => withAutoStart(s, now, cfg))
+}
+
+/** `/context-alert pause` and `resume`. */
+export function setPaused($: EngineInterface, sid: string, paused: boolean): Promise<SessionState> {
+  return updateSession($, sid, (s) => {
+    if (!!s.paused === paused) return s
+    const { paused: _p, ...rest } = s
+    return paused ? { ...rest, paused: true } : rest
+  })
+}
+
+/** The loop breaker's hold on auto mode for this session. */
+export function setAutoHeld($: EngineInterface, sid: string, held: boolean): Promise<SessionState> {
+  return updateSession($, sid, (s) => {
+    if (!!s.autoHeld === held) return s
+    const { autoHeld: _h, ...rest } = s
+    return held ? { ...rest, autoHeld: true } : rest
   })
 }
 

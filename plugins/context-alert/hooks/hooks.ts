@@ -1,10 +1,15 @@
 import type { EngineInterface, Register } from 'claude-code'
-import { getConfig, newRuntime, refreshConfig, resetConversation, tryAlert, type Runtime } from './alert'
+import { autoPlan, getConfig, newRuntime, refreshConfig, resetConversation, tryAlert, type Runtime } from './alert'
 import { handleCommand } from './command'
-import { afterCompaction, noteFlowWrite, onFlowCommand, onFlowPrompt, onFlowTurnEnd } from './flow'
 import {
-  belowFirst, crossed, extractHandoffPath, extractSkillHandoffPath, extractSlashHandoffPath, formatTokens, handoffPathFromWrite,
-  isHandoffSkill, isMarkdownWrite, nextThreshold, rearm, shouldToast, skillNameOf, type SessionState,
+  afterCompaction, cancelAutoFlow, endFlow, holdAuto, noteAfterAutoWrite, noteFlowWrite, onFlowCommand, onFlowPrompt, onFlowTurnEnd,
+  recheckWait, runtimeStatus, sendAfterAuto,
+} from './flow'
+import { autoCompactFocus, autoMidTurnToast } from './flow-logic'
+import {
+  appendInstructions, belowFirst, crossed, extractHandoffPath, extractSkillHandoffPath, extractSlashHandoffPath, formatTokens,
+  handoffPathFromWrite, isEnabled, isHandoffSkill, isMarkdownWrite, nextThreshold, rearm, shouldToast, skillNameOf,
+  type SessionState,
 } from './logic'
 import { loadSession, pruneSessions, rememberHandoffPath, updateSession } from './state'
 
@@ -30,10 +35,15 @@ async function onMeasure($: EngineInterface, rt: Runtime, e: Measure): Promise<v
   if (contextMoved) {
     const sid = await $.session.id()
     await updateSession($, sid, (s) => rearm(s, cfg, percent, tokens)) // a drop re-arms even mid-turn
+    // The loop breaker's read, when the fill was unknown as the auto cycle's compaction landed (S6).
+    if (rt.loopCheck && percent !== undefined && tokens !== undefined) {
+      rt.loopCheck = false
+      if (!belowFirst(cfg, percent, tokens)) await holdAuto($, rt, cfg, percent)
+    }
   }
   if (rt.mainTurnRunning) {
     const over = crossed(cfg, { pct: cfg.percent, tokens: cfg.tokens }, percent, tokens)
-    if (contextMoved && cfg.enabled && over) rt.pending = true
+    if (contextMoved && isEnabled(cfg) && over) rt.pending = true
     return
   }
   await tryAlert($, rt, contextMoved ? { percent, tokens, window } : undefined)
@@ -41,7 +51,7 @@ async function onMeasure($: EngineInterface, rt: Runtime, e: Measure): Promise<v
 
 async function onToolCallToast($: EngineInterface, rt: Runtime): Promise<void> {
   const cfg = await getConfig($, rt)
-  if (!cfg.enabled || !cfg.midTurnToast) return
+  if (!isEnabled(cfg) || !cfg.midTurnToast) return
   const { context } = await $.session.usage()
   // Cheap exit before touching the session store: nothing below the first threshold can toast.
   const { percent, tokens } = context
@@ -49,13 +59,20 @@ async function onToolCallToast($: EngineInterface, rt: Runtime): Promise<void> {
   if (belowFirst(cfg, percent, tokens)) return
   const sid = await $.session.id()
   let toasted = false
+  let auto = false
+  const nowMs = await $.clock.now()
   await updateSession($, sid, (s: SessionState) => {
-    if (!shouldToast(s, cfg, percent, tokens)) return s
+    if (s.paused || !shouldToast(s, cfg, percent, tokens)) return s // paused: no alerts, so no toast either
     toasted = true
+    auto = autoPlan(cfg, s, rt, nowMs).auto
     return { ...s, toastedAt: nextThreshold(s, cfg) }
   })
   if (toasted) {
-    $.ui.toast(`Context at ${percent}% (${formatTokens(tokens)}). A handoff prompt follows when this turn ends.`)
+    $.ui.toast(
+      auto
+        ? autoMidTurnToast(percent, tokens)
+        : `Context at ${percent}% (${formatTokens(tokens)}). A handoff prompt follows when this turn ends.`,
+    )
   }
 }
 
@@ -64,7 +81,7 @@ async function onSessionStart($: EngineInterface, rt: Runtime): Promise<void> {
     await $.command.register({
       name: 'context-alert',
       description: 'Show or set the context-window handoff alert',
-      argumentHint: '[status | show | set <key> <value> | reset [session]]',
+      argumentHint: '[status | show | set <key> <value> | pause | resume | reset [session]]',
     })
   } catch (err) {
     $.ui.log(`context-alert: could not register /context-alert: ${String(err)}`)
@@ -121,6 +138,7 @@ export const register: Register = (on) => {
       rt.compacting = false // the compaction ran or was dropped; either way the session moved on
       rt.notifyOnCompact = false // so a dropped compaction's notification cannot ride a later auto-compaction
       rt.nudgeAfterCompact = undefined // nor its continue nudge
+      rt.afterAuto = undefined // the after-compaction prompt either started this turn or is stale
       rt.turnOrigin = rt.nextTurnOrigin // undefined: a prompt this mod did not see (its own, or queued mid-turn)
       rt.nextTurnOrigin = undefined
     }
@@ -130,9 +148,15 @@ export const register: Register = (on) => {
     const r = await next(e)
     if (e.agentId === undefined) {
       rt.mainTurnRunning = false
+      rt.afterAutoHandoff = undefined // an S4 handoff turn, if that is what ended, is over
       // A flow holds every alert (tryAlert re-marks it pending), so a pending tier cannot open a dialog first.
       if (rt.flow) void onFlowTurnEnd($, rt, e).catch(quiet)
-      if (rt.pending) void tryAlert($, rt).catch(quiet)
+      if (rt.afterAuto) {
+        // S4: Claude Code compacted mid-turn; this is the idle point. An alert waits for the turn the prompt starts.
+        void sendAfterAuto($, rt, e)
+          .then((sent) => (!sent && rt.pending ? tryAlert($, rt) : undefined))
+          .catch(quiet)
+      } else if (rt.pending) void tryAlert($, rt).catch(quiet)
     }
     return r
   })
@@ -140,12 +164,24 @@ export const register: Register = (on) => {
   // A compaction of the main conversation (manual, auto, a plugin's) starts the tiers over at the first
   // threshold. The step-up only applies while the person keeps going without compacting.
   on('session.compact', async ($, e, next) => {
-    const r = await next(e)
+    // S4: Claude Code's own auto-compaction (main thread) gets focus instructions, in any mode. It is never vetoed
+    // (the same trigger covers "prompt too long"). The one hook that does work before next(e), so it is guarded and quick.
+    let sent = e
+    if (e.agentId === undefined && e.trigger === 'auto') {
+      try {
+        if ((await getConfig($, rt)).focusAutoCompact) {
+          const path = (await loadSession($, await $.session.id())).handoff
+          sent = { ...e, instructions: appendInstructions(e.instructions, autoCompactFocus(path)) }
+          $.ui.log(`context-alert: auto-compaction focus added (${path ? 'path known' : 'no path'})`, { to: 'debug' })
+        }
+      } catch { sent = e }
+    }
+    const r = await next(sent)
     const skipped = (r as { skip?: string } | undefined)?.skip
     if (e.agentId === undefined && e.trigger !== 'precompute') rt.compacting = false
     if (e.agentId === undefined && e.trigger !== 'precompute' && skipped) { rt.notifyOnCompact = false; rt.nudgeAfterCompact = undefined }
     if (e.agentId === undefined && e.trigger !== 'precompute' && !skipped) {
-      void afterCompaction($, rt, e.instructions, e.trigger).catch(quiet) // tiers reset (D15), any flow ends (D26)
+      void afterCompaction($, rt, e.instructions, e.trigger, (r as { tokensAfter?: number } | undefined)?.tokensAfter).catch(quiet) // tiers reset (D15), any flow ends (D26)
     }
     return r
   })
@@ -172,6 +208,10 @@ export const register: Register = (on) => {
       if (written) void rememberHandoffPath($, written).catch(quiet)
       // The handoff-compact flow: any .md written counts (the doc may live outside a handoff/ folder).
       if (rt.flow && isMarkdownWrite(e.tool, filePath)) noteFlowWrite(rt.flow, e.tool, filePath as string)
+      // An S4 handoff turn: any .md it writes is the handoff doc (F16).
+      if (rt.afterAutoHandoff && isMarkdownWrite(e.tool, filePath)) noteAfterAutoWrite($, rt, e.tool, filePath as string)
+      // S4: a handoff doc written since the last compaction (a flow's .md write counts too).
+      if (written || (rt.flow && isMarkdownWrite(e.tool, filePath))) rt.handoffSinceCompact = true
     }
     return r
   })
@@ -240,11 +280,25 @@ export const register: Register = (on) => {
     try {
       return {
         text: await handleCommand($, e.args, {
-          onConfig: (cfg) => { rt.config = cfg },
-          onResetSession: () => {
-            rt.pending = false; rt.suggestAnnounced = undefined; rt.refusals = 0; rt.flow = undefined
-            rt.notifyOnCompact = false; rt.nudgeAfterCompact = undefined; rt.compacting = false; rt.epoch++
+          onConfig: (cfg) => {
+            const prev = rt.config
+            rt.config = cfg
+            let note: string | undefined
+            if (cfg.mode !== 'auto') {
+              // auto was switched off: its flow stops, and the reply says so (F15)
+              if (cancelAutoFlow(rt)) note = 'The running auto handoff-compact was stopped.'
+              rt.afterAuto = undefined
+            } else if (prev && prev.maxWait !== cfg.maxWait) void recheckWait($, rt).catch(quiet) // a lowered limit applies now (F7)
+            return note
           },
+          onResetSession: () => {
+            rt.pending = false; rt.suggestAnnounced = undefined; rt.refusals = 0; endFlow(rt)
+            rt.notifyOnCompact = false; rt.nudgeAfterCompact = undefined; rt.compacting = false; rt.epoch++
+            rt.afterAuto = undefined; rt.loopCheck = false
+          },
+          onPause: () => { cancelAutoFlow(rt); rt.afterAuto = undefined; rt.loopCheck = false },
+          onResume: () => { rt.pending = true; void tryAlert($, rt).catch(quiet) }, // an alert may be due now
+          runtimeStatus: () => runtimeStatus($, rt),
         }),
       }
     } catch (err) {

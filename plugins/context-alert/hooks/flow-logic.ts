@@ -1,5 +1,5 @@
 // Pure helpers for the /handoff-compact flow (proposal 05/06). No `$` calls here.
-import { isBusyStatus } from './logic'
+import { dirWithSlash, formatTokens, isBusyStatus, NO_PATH_AUTO_FOCUS, shortPath } from './logic'
 
 export type HandoffCompactArgs = { now: boolean; path?: string }
 
@@ -63,11 +63,94 @@ export function diffBusy(before: readonly string[], now: readonly string[]): str
   return [...new Set(before)].filter(id => !still.has(id))
 }
 
-/** Compaction focus instructions (D26). */
-export function focusInstructions(path: string | undefined): string {
-  return path
+/**
+ * Compaction focus instructions (D26). `running` (labels of top-level agents still busy when the flow went ahead
+ * without them, S2) adds a line saying their reports arrive after the compaction.
+ */
+export function focusInstructions(path: string | undefined, running: readonly string[] = []): string {
+  const base = path
     ? `A handoff doc for this session is at ${path}. Keep that path and its Open follow-ups in the summary.`
     : 'A handoff doc was written for this session. Keep its path and its Open follow-ups in the summary.'
+  return running.length > 0
+    ? `${base} Agents still running: ${running.join(', ')}. Their reports arrive after the compaction.`
+    : base
+}
+
+/** Claude Code's own auto-compaction (S4): the known doc, or "keep the work in progress". */
+export function autoCompactFocus(path: string | undefined): string {
+  return path ? focusInstructions(path) : NO_PATH_AUTO_FOCUS
+}
+
+// The two skill ids are named in full so Claude resolves the project's copy first, then the bundled one.
+export const SKILLS = 'the skill `handoff-doc` if this project has one, otherwise the bundled skill `context-alert:handoff-doc`'
+
+/**
+ * The auto flow's handoff prompt (S5): never asks. With a path, the known-path wording plus a no-question line;
+ * without, Claude picks the path from the project's handoff folder and pattern, else `dir` (or ./handoff/).
+ */
+export function autoHandoffPrompt(path: string | undefined, dir?: string): string {
+  if (path) {
+    return (
+      `Context is getting heavy, so please write the handoff doc for this session, using ${path} ` +
+      `(the existing doc there or the next one in its series), with ${SKILLS}. ` +
+      'Do not ask me anything; if it is unclear whether to update that doc or write a sequel, write a sequel. Say which file you wrote.'
+    )
+  }
+  return (
+    `Context is getting heavy, so write the handoff doc for this session now with ${SKILLS}. ` +
+    'Do not ask me anything: pick the path yourself. Use this project\'s handoff folder and its naming pattern if it has one ' +
+    `(a "Latest handoff" line in CLAUDE.md names it), otherwise create ${dirWithSlash(dir)}YYYYMMDD_01_<short-slug>.md. ` +
+    'If the existing doc rules leave it unclear, write a sequel. Say which file you wrote.'
+  )
+}
+
+/** S4, after Claude Code's own auto-compaction with no handoff since the last one: write one, then carry on. */
+export function afterAutoHandoffPrompt(path: string | undefined, dir?: string): string {
+  return `${autoHandoffPrompt(path, dir)} Then continue the work in progress. If nothing is left, or the next step needs the user, say so and stop.`
+}
+
+/** Auto mode toasts (S1). */
+export function autoStartToast(percent: number, tokens: number): string {
+  return `Context at ${percent}% (${formatTokens(tokens)}). Auto handoff-compact: writing the handoff doc. Type anything to cancel.`
+}
+export function autoMidTurnToast(percent: number, tokens: number): string {
+  return `Context at ${percent}% (${formatTokens(tokens)}). Auto handoff-compact runs when this turn ends.`
+}
+export const autoCancelledToast = (next: string, writing = false): string =>
+  `Auto handoff-compact cancelled; the next alert is at ${next}.${writing ? ' The handoff doc may still be written.' : ''}`
+
+/**
+ * The args of the auto flow's `/handoff-doc <path>` call (S5): the path (quoted when it has spaces) and a directive that
+ * the skill must not ask. The skill takes an explicit "sequel" as the person's own instruction, so unclear cases resolve.
+ */
+export function autoHandoffArgs(path: string): string {
+  const p = /\s/.test(path) ? `"${path}"` : path
+  return `${p} Do not ask me anything and do not use AskUserQuestion: decide update or sequel yourself; if it is unclear, write a sequel. Say which file you wrote.`
+}
+
+/** The end-of-cycle notification: where the doc went, and agents that were left running. */
+export function autoDoneNotification(path: string | undefined, left: number): string {
+  const doc = path ? `Handoff written to ${shortPath(path)}, context compacted.` : 'Handoff written, context compacted.'
+  return left > 0 ? `${doc} ${left} ${left === 1 ? 'agent' : 'agents'} still running.` : doc
+}
+export const AUTO_DONE_TITLE = 'Auto handoff-compact done'
+
+export const afterAutoNotification = (kind: 'handoff' | 'continue'): string =>
+  kind === 'handoff'
+    ? 'Claude Code compacted the context. Writing a handoff doc, then carrying on.'
+    : 'Claude Code compacted the context. Carrying on from the handoff doc.'
+
+/** Why a flow went ahead, for the one log line per cycle. */
+export function whyLabel(why: 'no-agents' | 'room' | 'maxWait' | 'force', waited: boolean): string {
+  if (why === 'no-agents') return waited ? 'all done' : 'no agents'
+  if (why === 'room') return 'room'
+  if (why === 'maxWait') return 'maxWait'
+  return 'now'
+}
+
+/** The after-compaction prompt for S4 (when Claude Code compacted by itself). */
+export function afterAutoPrompt(kind: 'handoff' | 'continue', path: string | undefined, dir?: string): string {
+  return kind === 'handoff' ? afterAutoHandoffPrompt(path, dir) : continuePrompt(path)
 }
 
 /** The nudge sent once a handoff flow's compaction landed with no agent still running. */

@@ -4,6 +4,7 @@ import {
   extractHandoffPath, extractSkillHandoffPath, staleSessionKeys, formatTokens,
   shortPath, questionText, dialogOptions, resetTiers, isMarkdownWrite, shouldToast, handoffPathFromWrite, extractSlashHandoffPath,
   classifyAskError, isBusyStatus, skillNameOf, crossed, belowFirst,
+  effectiveReserve, waitDecision, roomLeft, cycleAllowed, withAutoStart, appendInstructions, dirWithSlash,
 } from '../hooks/logic'
 
 const EITHER = { ...DEFAULTS, trigger: 'either' as const }
@@ -24,7 +25,7 @@ describe('thresholds', () => {
     expect(shouldFire(emptyState(), EITHER, 90, undefined)).toBe(false)
   })
   test('disabled never fires', () => {
-    expect(shouldFire(emptyState(), { ...EITHER, enabled: false }, 90, 900000)).toBe(false)
+    expect(shouldFire(emptyState(), { ...EITHER, mode: 'off' }, 90, 900000)).toBe(false)
   })
   test('re-asks at +15 points or +150k tokens', () => {
     const s = asked(41, 410000)
@@ -279,5 +280,182 @@ describe('trigger mode', () => {
     expect(shouldToast(emptyState(), DEFAULTS, 30, 900000)).toBe(false)
     expect(shouldToast(emptyState(), DEFAULTS, 41, 1000)).toBe(true)
     expect(shouldToast(emptyState(), T, 90, 1000)).toBe(false)
+  })
+})
+
+describe('autopilot (0.3.0): config', () => {
+  test('defaults', () => {
+    expect(DEFAULTS).toMatchObject({
+      mode: 'ask', maxWait: 20, reserve: 'auto', maxCycles: 3, cycleWindow: 60, focusAutoCompact: true, afterAutoCompact: true, handoffDir: '',
+    })
+  })
+  test('mergeConfig migrates enabled: false to off, otherwise ask; mode wins over enabled', () => {
+    expect(mergeConfig({ enabled: false }).mode).toBe('off')
+    expect(mergeConfig({ enabled: true }).mode).toBe('ask')
+    expect(mergeConfig({}).mode).toBe('ask')
+    expect(mergeConfig(undefined).mode).toBe('ask')
+    expect(mergeConfig({ mode: 'auto', enabled: false }).mode).toBe('auto')
+    expect(mergeConfig({ mode: 'off' }).mode).toBe('off')
+    expect(mergeConfig({ mode: 'loud', enabled: false }).mode).toBe('off')
+    expect(mergeConfig({ mode: 'loud' }).mode).toBe('ask')
+  })
+  test('mergeConfig keeps zeros for the limits that allow them, and refuses negatives and junk', () => {
+    const c = mergeConfig({ maxWait: 0, reserve: 0, maxCycles: 0, cycleWindow: 0 })
+    expect(c.maxWait).toBe(0)
+    expect(c.reserve).toBe(0)
+    expect(c.maxCycles).toBe(0)
+    expect(c.cycleWindow).toBe(60) // 0 is not a window
+    const d = mergeConfig({ maxWait: -1, reserve: 'x', maxCycles: Number.NaN, handoffDir: 5, focusAutoCompact: 'no' })
+    expect(d).toMatchObject({ maxWait: 20, reserve: 'auto', maxCycles: 3, handoffDir: '', focusAutoCompact: true })
+    expect(mergeConfig({ handoffDir: ' /p/h ', focusAutoCompact: false, afterAutoCompact: false })).toMatchObject({
+      handoffDir: '/p/h', focusAutoCompact: false, afterAutoCompact: false,
+    })
+  })
+  test('parseSet: mode', () => {
+    expect(parseSet('mode', 'auto')).toEqual({ ok: true, key: 'mode', value: 'auto' })
+    expect(parseSet('mode', 'ASK')).toEqual({ ok: true, key: 'mode', value: 'ask' })
+    expect(parseSet('mode', 'off')).toEqual({ ok: true, key: 'mode', value: 'off' })
+    expect(parseSet('mode', 'on').ok).toBe(false)
+  })
+  test('parseSet: enabled is an alias of mode ask / off', () => {
+    expect(parseSet('enabled', 'on')).toEqual({ ok: true, key: 'mode', value: 'ask' })
+    expect(parseSet('enabled', 'true')).toEqual({ ok: true, key: 'mode', value: 'ask' })
+    expect(parseSet('enabled', 'off')).toEqual({ ok: true, key: 'mode', value: 'off' })
+    expect(parseSet('enabled', 'False')).toEqual({ ok: true, key: 'mode', value: 'off' })
+    expect(parseSet('enabled', 'auto').ok).toBe(false)
+  })
+  test('parseSet: zero-allowed numbers', () => {
+    for (const k of ['maxWait', 'reserve', 'maxCycles']) expect(parseSet(k, '0')).toEqual({ ok: true, key: k, value: 0 })
+    expect(parseSet('maxWait', '2.5')).toEqual({ ok: true, key: 'maxWait', value: 2.5 })
+    expect(parseSet('reserve', '80000')).toEqual({ ok: true, key: 'reserve', value: 80000 })
+    expect(parseSet('reserve', '1.5').ok).toBe(false)
+    expect(parseSet('maxCycles', '2.5').ok).toBe(false)
+    expect(parseSet('maxWait', '-3').ok).toBe(false)
+    expect(parseSet('maxWait', 'abc').ok).toBe(false)
+  })
+  test('parseSet: positive numbers refuse 0 (cycleWindow, and the old keys)', () => {
+    expect(parseSet('cycleWindow', '30')).toEqual({ ok: true, key: 'cycleWindow', value: 30 })
+    expect(parseSet('cycleWindow', '0').ok).toBe(false)
+    expect(parseSet('percent', '0').ok).toBe(false)
+    expect(parseSet('tokens', '0').ok).toBe(false)
+  })
+  test('parseSet: the new booleans', () => {
+    expect(parseSet('focusAutoCompact', 'off')).toEqual({ ok: true, key: 'focusAutoCompact', value: false })
+    expect(parseSet('afterAutoCompact', 'On')).toEqual({ ok: true, key: 'afterAutoCompact', value: true })
+    expect(parseSet('afterAutoCompact', 'maybe').ok).toBe(false)
+  })
+  test('parseSet: handoffDir is a string and none clears it', () => {
+    expect(parseSet('handoffDir', ' /p/notes ')).toEqual({ ok: true, key: 'handoffDir', value: '/p/notes' })
+    expect(parseSet('handoffDir', 'none')).toEqual({ ok: true, key: 'handoffDir', value: '' })
+    expect(parseSet('handoffDir', 'NONE')).toEqual({ ok: true, key: 'handoffDir', value: '' })
+    expect(parseSet('handoffDir', '').ok).toBe(false)
+  })
+  test('parseSet: the unknown-key message lists the new keys', () => {
+    const r = parseSet('nope', '1')
+    expect(r.ok).toBe(false)
+    for (const k of ['mode', 'maxWait', 'reserve', 'maxCycles', 'cycleWindow', 'focusAutoCompact', 'afterAutoCompact', 'handoffDir']) {
+      expect((r as { error: string }).error).toContain(k)
+    }
+  })
+  test('mode off never fires; auto and ask do', () => {
+    expect(shouldFire(emptyState(), { ...DEFAULTS, mode: 'off' }, 90, 900000)).toBe(false)
+    expect(shouldFire(emptyState(), { ...DEFAULTS, mode: 'auto' }, 90, 900000)).toBe(true)
+    expect(shouldFire(emptyState(), { ...DEFAULTS, mode: 'ask' }, 90, 900000)).toBe(true)
+  })
+  test('rearm below the first threshold also lets go of the loop breaker hold', () => {
+    const held = { asked: [], autoHeld: true }
+    expect(rearm(held, DEFAULTS, 10, 100000).autoHeld).toBeUndefined()
+    expect(rearm(held, DEFAULTS, 50, 500000).autoHeld).toBe(true)
+    expect(rearm(held, DEFAULTS, undefined, undefined).autoHeld).toBe(true)
+  })
+})
+
+describe('autopilot (0.3.0): wait or go, cycles', () => {
+  const base = { busy: true, room: 200_000, reserve: 80_000, waitedMs: 0, maxWaitMs: 20 * 60_000, auto: true }
+  test('no agent busy: go', () => {
+    expect(waitDecision({ ...base, busy: false })).toEqual({ go: true, why: 'no-agents' })
+  })
+  test('room under reserve: go, for any flow', () => {
+    expect(waitDecision({ ...base, room: 79_999 })).toEqual({ go: true, why: 'room' })
+    expect(waitDecision({ ...base, room: 79_999, auto: false })).toEqual({ go: true, why: 'room' })
+    expect(waitDecision({ ...base, room: 80_000 }).go).toBe(false)
+    expect(waitDecision({ ...base, room: -5 }).why).toBe('room') // already past the threshold
+  })
+  test('unknown room is never "no room"; reserve 0 is no check', () => {
+    expect(waitDecision({ ...base, room: undefined }).go).toBe(false)
+    expect(waitDecision({ ...base, room: 1, reserve: 0 }).go).toBe(false)
+  })
+  test('maxWait: auto flows only; 0 is no limit', () => {
+    expect(waitDecision({ ...base, waitedMs: 20 * 60_000 })).toEqual({ go: true, why: 'maxWait' })
+    expect(waitDecision({ ...base, waitedMs: 20 * 60_000 - 1 }).go).toBe(false)
+    expect(waitDecision({ ...base, waitedMs: 99 * 60_000, auto: false }).go).toBe(false)
+    expect(waitDecision({ ...base, waitedMs: 99 * 60_000, maxWaitMs: 0 }).go).toBe(false)
+  })
+  test('room wins over maxWait when both apply', () => {
+    expect(waitDecision({ ...base, room: 1, waitedMs: 99 * 60_000 }).why).toBe('room')
+  })
+  test('roomLeft', () => {
+    expect(roomLeft(500_000, 450_000)).toBe(50_000)
+    expect(roomLeft(undefined, 450_000)).toBeUndefined()
+    expect(roomLeft(500_000, undefined)).toBeUndefined()
+  })
+  test('cycleAllowed: counts starts inside the window; maxCycles 0 is no cap', () => {
+    const cfg = { maxCycles: 2, cycleWindow: 60 }
+    const now = 1_000_000_000
+    expect(cycleAllowed([], now, cfg)).toEqual({ ok: true, count: 0 })
+    expect(cycleAllowed(undefined, now, cfg)).toEqual({ ok: true, count: 0 })
+    expect(cycleAllowed([now - 1000], now, cfg)).toEqual({ ok: true, count: 1 })
+    expect(cycleAllowed([now - 1000, now - 2000], now, cfg)).toEqual({ ok: false, count: 2 })
+    expect(cycleAllowed([now - 61 * 60_000, now - 2000], now, cfg)).toEqual({ ok: true, count: 1 })
+    expect(cycleAllowed([now - 60 * 60_000, now - 2000], now, cfg).count).toBe(1) // exactly the window old has left it
+    expect(cycleAllowed([1, 2, 3, 4, 5].map((i) => now - i), now, { maxCycles: 0, cycleWindow: 60 }).ok).toBe(true)
+  })
+  test('withAutoStart appends and drops the old ones', () => {
+    const s = withAutoStart({ asked: [], autoStarts: [1, 999_999_000] }, 1_000_000_000, { cycleWindow: 60 })
+    expect(s.autoStarts).toEqual([999_999_000, 1_000_000_000])
+  })
+  test('appendInstructions and dirWithSlash', () => {
+    expect(appendInstructions(undefined, 'F')).toBe('F')
+    expect(appendInstructions('  ', 'F')).toBe('F')
+    expect(appendInstructions('mine', 'F')).toBe('mine\n\nF')
+    expect(dirWithSlash('')).toBe('./handoff/')
+    expect(dirWithSlash(undefined)).toBe('./handoff/')
+    expect(dirWithSlash('/a/b')).toBe('/a/b/')
+    expect(dirWithSlash('/a/b/')).toBe('/a/b/')
+  })
+})
+
+describe('autopilot after review 03', () => {
+  test('effectiveReserve: auto scales with the threshold, capped at 80k; a number is used as is', () => {
+    expect(effectiveReserve('auto', 167_000)).toBe(25_050) // a 200k window
+    expect(effectiveReserve('auto', 967_000)).toBe(80_000) // a 1M window
+    expect(effectiveReserve('auto', 500_000)).toBe(75_000)
+    expect(effectiveReserve('auto', undefined)).toBe(0) // unknown threshold: no check
+    expect(effectiveReserve(80_000, 167_000)).toBe(80_000)
+    expect(effectiveReserve(0, 967_000)).toBe(0)
+    expect(effectiveReserve(12_345, undefined)).toBe(12_345)
+  })
+  test('reserve: auto is stored as auto, numbers as numbers, junk falls back to auto', () => {
+    expect(mergeConfig({ reserve: 'auto' }).reserve).toBe('auto')
+    expect(mergeConfig({ reserve: 0 }).reserve).toBe(0)
+    expect(mergeConfig({ reserve: 50_000 }).reserve).toBe(50_000)
+    expect(mergeConfig({ reserve: 1.5 }).reserve).toBe('auto')
+    expect(mergeConfig({ reserve: -1 }).reserve).toBe('auto')
+    expect(mergeConfig({ reserve: 'lots' }).reserve).toBe('auto')
+  })
+  test('parseSet reserve: auto, default, whole numbers, zero; decimals and junk refused', () => {
+    expect(parseSet('reserve', 'auto')).toEqual({ ok: true, key: 'reserve', value: 'auto' })
+    expect(parseSet('reserve', 'Default')).toEqual({ ok: true, key: 'reserve', value: 'auto' })
+    expect(parseSet('reserve', '0')).toEqual({ ok: true, key: 'reserve', value: 0 })
+    expect(parseSet('reserve', '80000')).toEqual({ ok: true, key: 'reserve', value: 80000 })
+    expect(parseSet('reserve', '1.5').ok).toBe(false)
+    expect(parseSet('reserve', '-5').ok).toBe(false)
+    expect(parseSet('reserve', 'lots').ok).toBe(false)
+  })
+  test('decimals: maxWait and cycleWindow take them, reserve and maxCycles do not (D41)', () => {
+    expect(parseSet('maxWait', '0.5')).toEqual({ ok: true, key: 'maxWait', value: 0.5 })
+    expect(parseSet('cycleWindow', '0.5')).toEqual({ ok: true, key: 'cycleWindow', value: 0.5 })
+    expect(parseSet('reserve', '0.5').ok).toBe(false)
+    expect(parseSet('maxCycles', '0.5').ok).toBe(false)
   })
 })

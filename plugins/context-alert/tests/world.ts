@@ -30,6 +30,20 @@ export type World = {
   listDelayMs: number
   /** session.compact comes back vetoed while true (starts as Opts.compactRejects); tests may flip it. */
   compactVeto: boolean
+  /** What $.session.usage() reports; tests may change it between events (the fill after a compaction, say). */
+  usage: { percent?: number; tokens?: number }
+  /** `context.breakdown.autoCompactThreshold` for a call that asks for a breakdown; undefined = auto-compact off. */
+  autoCompactThreshold: number | undefined
+  /** `context.breakdown.totalTokens` for a call that asks for a breakdown (the estimate that sits beside the threshold). */
+  breakdownTotal: number | undefined
+  /** The `tokensAfter` a landed session.compact reports (undefined: the engine did not record it). */
+  tokensAfter: number | undefined
+  /** A usage call that asks for a breakdown rejects while true. */
+  breakdownFails: boolean
+  /** How many usage calls asked for a breakdown. */
+  breakdownCalls: number
+  /** The `trigger` each session.compact call carried. */
+  compactTriggers: string[]
   registered: string[]
   clock: ReturnType<typeof mock.clock>
   store: Map<string, unknown>
@@ -42,6 +56,8 @@ export type Opts = {
   /** Hold the dialog's answer on the mocked clock for this long. */
   askDelayMs?: number
   usage?: { percent?: number; tokens?: number }
+  /** The room before Claude Code's own auto-compact: its threshold in tokens (default: auto-compact off). */
+  autoCompactThreshold?: number
   store?: Record<string, unknown>
   /** Command names whose $.command.run the world refuses. */
   refuse?: string[]
@@ -65,7 +81,8 @@ export function world($: Dollar, on: On, o: Opts = {}): World {
     asks: [], toasts: [], suggests: [], notifies: [], suggestShown: true, submits: [], runs: [], logs: [], compacts: 0,
     registered: [], store: new Map(), clock: undefined as never, compactInstructions: [],
     agents: (o.agents ?? []).map((a) => ({ ...a })), agentListFails: false, order: [], listDelayMs: 0,
-    compactVeto: o.compactRejects === true,
+    compactVeto: o.compactRejects === true, usage: { ...(o.usage ?? {}) }, autoCompactThreshold: o.autoCompactThreshold,
+    breakdownTotal: undefined, tokensAfter: undefined, breakdownFails: false, breakdownCalls: 0, compactTriggers: [],
   }
   for (const [k, v] of Object.entries(o.store ?? {})) w.store.set(k, JSON.parse(JSON.stringify(v)))
   on('store.get', (_, e) => ({ value: w.store.get(e.key) }))
@@ -76,20 +93,40 @@ export function world($: Dollar, on: On, o: Opts = {}): World {
   on('session.id', () => ({ value: 'S1' }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('session.measure', (_, e) => ({ changed: e.changed }))
-  on('session.usage', () => ({
-    value: {
-      startedAt: 0,
-      context: { window: 1_000_000, percent: o.usage?.percent, tokens: o.usage?.tokens },
-      rateLimits: [],
-    },
-  }))
+  on('session.usage', (_, e) => {
+    const asked = (e as { breakdown?: unknown }).breakdown !== undefined
+    if (asked) w.breakdownCalls++
+    if (asked && w.breakdownFails) return { deny: 'usage breakdown unavailable' } as never
+    return {
+      value: {
+        startedAt: 0,
+        context: {
+          window: 1_000_000, percent: w.usage.percent, tokens: w.usage.tokens,
+          ...(asked && (w.autoCompactThreshold !== undefined || w.breakdownTotal !== undefined)
+            ? {
+                breakdown: {
+                  ...(w.autoCompactThreshold !== undefined ? { autoCompactThreshold: w.autoCompactThreshold } : {}),
+                  ...(w.breakdownTotal !== undefined ? { totalTokens: w.breakdownTotal } : {}),
+                  isAutoCompactEnabled: w.autoCompactThreshold !== undefined,
+                },
+              }
+            : {}),
+        },
+        rateLimits: [],
+      },
+    } as never
+  })
   on('session.messages', () => ({ value: (o.messages ?? []) as never }))
   on('session.compact', (_, e) => {
     w.compacts++
     w.compactInstructions.push(e.instructions)
+    w.compactTriggers.push(e.trigger)
     // The kit skips a hook that throws, so a rejection cannot be driven here; a veto ({ skip }) takes the same exit.
     if (w.compactVeto) return { skip: 'compaction refused while a turn runs' } as never
-    return { messages: [{ role: 'user', text: 'summary', toolUses: [] }] } as never
+    return {
+      messages: [{ role: 'user', text: 'summary', toolUses: [] }],
+      ...(w.tokensAfter !== undefined ? { tokensAfter: w.tokensAfter } : {}),
+    } as never
   })
   on('turn.start', (_, e) => ({ turnId: e.turnId }))
   on('turn.complete', (_, e) => ({ text: e.answer }))

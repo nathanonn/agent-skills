@@ -3,6 +3,7 @@ import {
   continuePrompt,
   parseHandoffCompactArgs, busyAgentIds, diffBusy, focusInstructions, waitToast, foldPrompt, alreadyRunningToast,
   HANDOFF_COMPACTING_TOAST, CANCELLED_TOAST, TURN_NOT_FINISHED_TOAST, unionIds, countsTowardWritingCap, pathIgnored,
+  autoCompactFocus, autoHandoffPrompt, afterAutoHandoffPrompt, autoDoneNotification, whyLabel, autoCancelledToast, autoStartToast, autoMidTurnToast, autoHandoffArgs,
 } from '../hooks/flow-logic'
 
 describe('parseHandoffCompactArgs', () => {
@@ -116,5 +117,60 @@ describe('review round 1 helpers', () => {
     expect(continuePrompt(undefined)).toBe(
       'Continue the work in progress from the handoff doc. If nothing is left, or the next step needs the user, say so and stop.',
     )
+  })
+})
+
+describe('autopilot (0.3.0) text', () => {
+  test('focusInstructions names the agents still running', () => {
+    expect(focusInstructions('/p/h.md', ['a', 'b'])).toBe(
+      'A handoff doc for this session is at /p/h.md. Keep that path and its Open follow-ups in the summary. Agents still running: a, b. Their reports arrive after the compaction.',
+    )
+    expect(focusInstructions('/p/h.md', [])).toBe(focusInstructions('/p/h.md'))
+  })
+  test('autoCompactFocus: the doc, or the work in progress', () => {
+    expect(autoCompactFocus('/p/h.md')).toBe(focusInstructions('/p/h.md'))
+    expect(autoCompactFocus(undefined)).toBe('Keep the work in progress, the decisions made and the open follow-ups in the summary.')
+  })
+  test('autoHandoffPrompt: known path, never asks', () => {
+    const t = autoHandoffPrompt('/p/h.md')
+    expect(t).toContain('write the handoff doc for this session, using /p/h.md')
+    expect(t).toContain('Do not ask me anything')
+    expect(t).not.toContain('AskUserQuestion')
+  })
+  test('autoHandoffPrompt: no path, the folder rules and the default or given folder', () => {
+    const t = autoHandoffPrompt(undefined)
+    expect(t).toContain('Do not ask me anything: pick the path yourself.')
+    expect(t).toContain('a "Latest handoff" line in CLAUDE.md')
+    expect(t).toContain('create ./handoff/YYYYMMDD_01_<short-slug>.md')
+    expect(t).toContain('write a sequel')
+    expect(t).toContain('Say which file you wrote.')
+    expect(autoHandoffPrompt(undefined, '/x/y')).toContain('create /x/y/YYYYMMDD_01_')
+  })
+  test('afterAutoHandoffPrompt adds the continue instruction', () => {
+    expect(afterAutoHandoffPrompt('/p/h.md')).toContain('Then continue the work in progress.')
+  })
+  test('toasts and notification', () => {
+    expect(autoStartToast(45, 450000)).toBe('Context at 45% (450k). Auto handoff-compact: writing the handoff doc. Type anything to cancel.')
+    expect(autoMidTurnToast(45, 450000)).toBe('Context at 45% (450k). Auto handoff-compact runs when this turn ends.')
+    expect(autoCancelledToast('60%')).toBe('Auto handoff-compact cancelled; the next alert is at 60%.')
+    expect(autoDoneNotification('/a/b/handoff/x.md', 0)).toBe('Handoff written to …/handoff/x.md, context compacted.')
+    expect(autoDoneNotification('/a/b/handoff/x.md', 1)).toBe('Handoff written to …/handoff/x.md, context compacted. 1 agent still running.')
+    expect(autoDoneNotification(undefined, 2)).toBe('Handoff written, context compacted. 2 agents still running.')
+  })
+  test('autoHandoffArgs: the path, then the no-question directive', () => {
+    const a = autoHandoffArgs('/p/h.md')
+    expect(a.startsWith('/p/h.md Do not ask me anything')).toBe(true)
+    expect(a).toContain('do not use AskUserQuestion')
+    expect(a).toContain('write a sequel')
+    expect(autoHandoffArgs('/p/a b.md').startsWith('"/p/a b.md" ')).toBe(true)
+  })
+  test('autoCancelledToast says when the doc may still be written', () => {
+    expect(autoCancelledToast('60%', true)).toBe('Auto handoff-compact cancelled; the next alert is at 60%. The handoff doc may still be written.')
+  })
+  test('whyLabel', () => {
+    expect(whyLabel('no-agents', false)).toBe('no agents')
+    expect(whyLabel('no-agents', true)).toBe('all done')
+    expect(whyLabel('room', true)).toBe('room')
+    expect(whyLabel('maxWait', true)).toBe('maxWait')
   })
 })
